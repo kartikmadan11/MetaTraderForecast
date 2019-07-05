@@ -3,3 +3,5 @@
 *.csv
 *.pyc
 *.h5
+*.jpg
+socketserverLR.py
