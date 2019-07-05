@@ -242,6 +242,8 @@ def test(testing_set, date, file_name):
         predicted_stock_price = regressor.predict(X_test)
         predicted_stock_price = scaler.inverse_transform(predicted_stock_price)
 
+        save_plot(test_set, predicted_stock_price, file_name)
+
         eval = regressor.evaluate(X_test, scaler.transform(test_set.reshape(-1,1)))
 
         pickle_out = open(file_name + '_testhist.pickle', 'wb')
@@ -270,8 +272,8 @@ def evaluate(file_name, testing_weight):
     
     return scoreList
 
-def predict(file_name, ticks):
-    if(ticks < window_size):
+def predict(file_name, bars):
+    if(bars < window_size):
         
         prev_dataset = pd.read_csv(file_name + '.csv', index_col = 'Date', parse_dates=['Date'])
         
@@ -281,7 +283,7 @@ def predict(file_name, ticks):
         scaler = pickle.load(file)
         file.close()
 
-        inputs = prev_dataset[len(prev_dataset) - ticks - window_size:]['Feature'].values
+        inputs = prev_dataset[len(prev_dataset) - bars - window_size:]['Feature'].values
         inputs = inputs.reshape(-1,1)
         inputs  = scaler.transform(inputs)
         
