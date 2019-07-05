@@ -59,5 +59,7 @@ class socketserver:
         
 serv = socketserver('127.0.0.1', 9090)
 
+print('Socket Created at {}. Waiting for client..'.format(serv.sock.getsockname()))
+
 while True:  
     msg = serv.recvmsg()
