@@ -1,6 +1,7 @@
 import socket
 import ast
 import build
+import json
 
 def train_test_model(msg = ''):
     msg = msg.replace('true','True')
@@ -22,15 +23,20 @@ def train_test_model(msg = ''):
     
     train = build.train(training_set=data[:trainSize], date=date[:trainSize], lr=input_data['LearningRate'], scale=input_data['Scale'], epochs=input_data['Epochs'], momentum=input_data['Momentum'], optimizer=input_data['Optimizer'], file_name=file_name, architecture=input_data['Architecture'])
     test = build.test(testing_set=data[trainSize:], date=date[trainSize:], file_name=input_data['FileName'])
-
     print(train)
     print(test)
     
     evaluate = build.evaluate(file_name=file_name, testing_weight=input_data['TestingWeight'])
-
     print(evaluate)
-    
-    return str(evaluate)
+
+    pred = build.predict(file_name, input_data['Bars'])
+    print(pred)
+
+    responseJSON = {}
+    responseJSON['Eval'] = evaluate
+    responseJSON['Pred'] = pred
+
+    return json.dumps(responseJSON)
 
 class socketserver:
     def __init__(self, address = '', port = 9090):
