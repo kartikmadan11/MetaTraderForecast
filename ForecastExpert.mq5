@@ -13,12 +13,15 @@
 enum Optimizer {
   RMSProp,
   SGD,
+  Adam,
+  Adagrad,
 };
   
 enum Architecture {
   LSTM,
   GRU,
   BidirectionalLSTM,
+  BidirectionalGRU,
 };
  
 enum Loss   {
@@ -32,21 +35,32 @@ enum Loss   {
 // Header file for JSON Serialization and Deserialization
 #include <JAson.mqh>
 
-bool gpu = true;
-bool train = true;
+//+------------------------------------------------------------------+
+//| Input Parameters                                                 |
+//+------------------------------------------------------------------+
 
-int trainingSize = 5000; // must be greater than window_size = 60
-int epochs = 50;
-int scale = 100;
+input Optimizer optimizer = RMSProp; // Optimizer
+input Architecture architecture = LSTM; // RNN Architecture
+input Loss loss = MSE; // Loss Function
 
-string fileName = "model1";
+input bool gpu = true; // Allow GPU Computations ?
+input bool train = true; // Train ?
 
-double momentum = 0.1;
-double learningRate = 0.001;
+//Train size must be greater than window_size = 60
+input int trainingSize = 5000; // Train Size 
 
-double testingPart = 10;
-double testingWeight = 50;
+input int epochs = 50;  // Epochs
+input int scale = 100; // Scale
 
+input string fileName = "model1"; // File Name to export model
+
+input double momentum = 0.1; // Momentum (for SGD)
+input double learningRate = 0.001; // Learning Rate 
+
+input double testingPart = 10; // Percentage of Train/Test Split
+input double testingWeight = 50; // Percentage of Train/Test Score Weights
+
+input int bars = 5; // Future bars to predict
 
 bool socksend(int sock,string request) {
    char req[];
@@ -95,46 +109,55 @@ void drawlr(string points)
 int OnInit()
 {
 //---
-int socket = SocketCreate();
-if(socket!=INVALID_HANDLE) {
-   if(SocketConnect(socket,"localhost",9090,1000)) {
-      Print("Connected to "," localhost",":",9090);
+   int socket = SocketCreate();
+   if(socket!=INVALID_HANDLE) {
+      if(SocketConnect(socket,"localhost",9090,1000)) {
+         Print("Connected to "," localhost",":",9090);
             
-      double clpr[];
-      int copyClose = CopyClose(_Symbol,PERIOD_CURRENT,0,trainingSize,clpr);
-      
-      datetime time[];
-      int copyTime = CopyTime(_Symbol,PERIOD_CURRENT,0,trainingSize,time);
-      
-      CJAVal json;
-      for (int i = 0; i < ArraySize(clpr); i++)
-      {
-         json["Data"].Add(DoubleToString(clpr[i], 6));
-         json["Time"].Add((string)time[i]);         
+         double clpr[];
+         int copyClose = CopyClose(_Symbol,PERIOD_CURRENT,0,trainingSize,clpr);
+         
+         datetime time[];
+         int copyTime = CopyTime(_Symbol,PERIOD_CURRENT,0,trainingSize,time);
+         
+         CJAVal json;
+         for (int i = 0; i < ArraySize(clpr); i++)
+         {
+            json["Data"].Add(DoubleToString(clpr[i], 6));
+            json["Time"].Add((string)time[i]);         
+         }
+         
+         json["FileName"] = fileName;
+         json["GPU"] = gpu;
+         json["Architecture"] = (int)architecture;
+         json["Optimizer"] = (int)optimizer;
+         json["Loss"] = (int)loss;
+         json["LearningRate"] = learningRate;
+         json["Epochs"] = epochs;
+         json["Scale"] = scale;
+         json["Momentum"] = momentum;
+         json["TestingPart"] = testingPart;
+         json["TestingWeight"] = testingWeight;
+         json["Bars"] = bars;
+         
+         string jsonString = json.Serialize();
+         bool send = socksend(socket, jsonString);
+         
+         string received = "";
+         do
+         {
+            received = socketreceive(socket, 10);   
+         }
+         while(send && SocketIsConnected(socket) && received != "");
+         
+         Print(received);    
       }
-      
-      json["FileName"] = fileName;
-      json["GPU"] = gpu;
-      json["Architecture"] = (int)LSTM;
-      json["Optimizer"] = (int)RMSProp;
-      json["LearningRate"] = learningRate;
-      json["Epochs"] = epochs;
-      json["Scale"] = scale;
-      json["Momentum"] = momentum;
-      json["TestingPart"] = testingPart;
-      json["TestingWeight"] = testingWeight;
-      
-      string jsonString = json.Serialize();
-      
-      string received = socksend(socket, jsonString) ? socketreceive(socket, 10) : ""; 
-      Print(received);   
-   }
+      else 
+         Print("Connection ","localhost",":",9090," error ",GetLastError());
+      SocketClose(socket);       
+      }
    else 
-      Print("Connection ","localhost",":",9090," error ",GetLastError());
-   SocketClose(socket);       
-   }
-else 
-   Print("Socket creation error ",GetLastError()); 
+      Print("Socket creation error ",GetLastError());       
 //---
    return(INIT_SUCCEEDED);
 }
@@ -142,9 +165,10 @@ else
 //| Expert deinitialization function                                 |
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
-  {
+{
 //---   
-  }
+   
+}
 //+------------------------------------------------------------------+
 //| Expert tick function                                             |
 //+------------------------------------------------------------------+
@@ -153,3 +177,8 @@ void OnTick()
 //---
 } 
 //+------------------------------------------------------------------+
+
+void OnTimer()
+{
+    
+}
