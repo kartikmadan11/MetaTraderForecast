@@ -62,6 +62,9 @@ input double testingWeight = 50; // Percentage of Train/Test Score Weights
 
 input int bars = 5; // Future bars to predict
 
+int socket; // Socket Variable 
+
+// Socket Send Function
 bool socksend(int sock,string request) {
    char req[];
    int  len=StringToCharArray(request,req)-1;
@@ -70,6 +73,7 @@ bool socksend(int sock,string request) {
    return(SocketSend(sock,req,len)==len); 
 }
 
+// Socket Receive Function
 string socketreceive(int sock,int timeout)   {
    char rsp[];
    string result="";
@@ -92,24 +96,33 @@ string socketreceive(int sock,int timeout)   {
    return result;
 }
 
-void drawlr(string points) 
+void drawpred(string res)
 {
-   string res[];
-   StringSplit(points,' ',res);
-   if(ArraySize(res)==2) 
+   CJAVal json;
+   if(!json.Deserialize(res)) {
+      Print("BAD RESPONSE !!");
+      return;
+   }
+   double predictions[];
+   ArrayResize(predictions, bars);
+   
+   for(int i=0;i<bars;i++)
    {
-      Print(StringToDouble(res[0]));
-      Print(StringToDouble(res[1]));
-      datetime temp[];
-      CopyTime(Symbol(),Period(),TimeCurrent(),trainingSize,temp);
-      ObjectCreate(0,"regrline",OBJ_TREND,0,TimeCurrent(),NormalizeDouble(StringToDouble(res[0]),_Digits),temp[0],NormalizeDouble(StringToDouble(res[1]),_Digits)); 
+      predictions[i] = NormalizeDouble(StringToDouble(json["Pred"][i].ToStr()), _Digits);
+      Print(predictions[i]);
+      Print(TimeCurrent() + ChartPeriod(0)*60*(i+1));
+      ObjectCreate(0, "pred" + IntegerToString(i + 1),OBJ_ARROW, 0, TimeCurrent() + ChartPeriod(0)*60*(i+1),  predictions[i]);
+      ObjectSetInteger(0, "pred" + IntegerToString(i + 1),OBJPROP_COLOR,clrRed); 
+      ObjectSetInteger(ChartID(), "pred" + IntegerToString(i + 1),OBJPROP_WIDTH,3);
+      ObjectSetInteger(0, "pred" + IntegerToString(i + 1),OBJPROP_ARROWCODE,159);
    }
 }
 
 int OnInit()
 {
 //---
-   int socket = SocketCreate();
+   EventSetTimer(10);
+   socket = SocketCreate();
    if(socket!=INVALID_HANDLE) {
       if(SocketConnect(socket,"localhost",9090,1000)) {
          Print("Connected to "," localhost",":",9090);
@@ -142,19 +155,13 @@ int OnInit()
          
          string jsonString = json.Serialize();
          bool send = socksend(socket, jsonString);
-         
-         string received = "";
-         do
-         {
-            received = socketreceive(socket, 10);   
-         }
-         while(send && SocketIsConnected(socket) && received != "");
-         
-         Print(received);    
+         if(send)
+            Print("Data Sent Successfully");
+          
       }
       else 
          Print("Connection ","localhost",":",9090," error ",GetLastError());
-      SocketClose(socket);       
+      //SocketClose(socket);       
       }
    else 
       Print("Socket creation error ",GetLastError());       
@@ -167,6 +174,7 @@ int OnInit()
 void OnDeinit(const int reason)
 {
 //---   
+   EventKillTimer();
    
 }
 //+------------------------------------------------------------------+
@@ -180,5 +188,16 @@ void OnTick()
 
 void OnTimer()
 {
-    
+
+   string received = "";
+   do
+   {
+      received = socketreceive(socket, 10);
+      if(received != "")   {
+         Print(received);
+         drawpred(received);
+      }
+         
+   }while(received != "");
+
 }
