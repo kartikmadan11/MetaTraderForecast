@@ -25,6 +25,10 @@ Specify amount of change to the model during each step of this search process, o
 ### GPU Computations
 For faster computations, GPU can be used. CUDA Support is required. CuDNN implemented RNN layers are used if GPU is opted
 
+### Input screen of EA
+
+![Inputs of EA](https://github.com/magiciankartik/MetaTraderForecast/blob/master/assets/EA_inputs.png)
+
 ## Setting up the project
 To run the forecaster, run the socketserver.py and wait for socket to be created. Now, attach the EA to the MT4/MT5 platform and specify the parameters for building the model. The predicted values are displayed on the same chart window. 
 
