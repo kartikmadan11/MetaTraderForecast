@@ -30,7 +30,11 @@ To run the forecaster, run the socketserver.py and wait for socket to be created
 
 `python socketserver.py`
 ### Test GPU Support
-If Tensorflow-gpu is present, run the following commands to check
+To install tensorflow-gpu use python package manager 
+
+`pip install tensorflow-gpu`
+
+If tensorflow-gpu is present, run the following commands to check
 
 `import tensorflow as tf`
 
@@ -39,7 +43,9 @@ If Tensorflow-gpu is present, run the following commands to check
 - Python 3.6 or higher (dev versions not recommended, use stable releases)
 - Tensorflow 1.14 or higher
 - Keras
-- **FOR GPU Support**
+
+**FOR GPU Support**
+
 - Tensorflow-gpu
 - CUDA 9.0 or higher(10.0 recommended)
 - cuDNN Library v7.4 or higher
