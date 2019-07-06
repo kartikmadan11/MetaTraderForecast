@@ -4,5 +4,6 @@
 *.pyc
 *.h5
 *.jpg
+*.pdf
 socketserverLR.py
 *.ipynb
