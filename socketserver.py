@@ -21,7 +21,7 @@ def train_test_model(msg = ''):
     testSize = int(input_data['TestingPart'] / 100 * len(data))
     trainSize = len(data) - testSize
     
-    train = build.train(training_set=data[:trainSize], date=date[:trainSize], lr=input_data['LearningRate'], scale=input_data['Scale'], epochs=input_data['Epochs'], momentum=input_data['Momentum'], optimizer=input_data['Optimizer'], file_name=file_name, architecture=input_data['Architecture'])
+    train = build.train(training_set=data[:trainSize], date=date[:trainSize], lr=input_data['LearningRate'], scale=input_data['Scale'], epochs=input_data['Epochs'], momentum=input_data['Momentum'], optimizer=input_data['Optimizer'], loss = input_data['Loss'], file_name=file_name, architecture=input_data['Architecture'])
     test = build.test(testing_set=data[trainSize:], date=date[trainSize:], file_name=input_data['FileName'])
     print(train)
     print(test)
