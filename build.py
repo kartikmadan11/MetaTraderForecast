@@ -11,7 +11,8 @@ from datetime import datetime
 
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, LSTM, CuDNNLSTM, GRU, CuDNNGRU, Bidirectional
-from keras.optimizers import SGD, RMSprop
+from keras.optimizers import SGD, RMSprop, Adam, Adagrad
+from keras.losses import mean_squared_error
 from keras.models import load_model
 from keras import backend as K
 
@@ -27,10 +28,13 @@ class Architecture(Enum):
     LSTM = 0
     GRU = 1
     BidirectionalLSTM = 2
+    BidirectionalGRU = 3
 
 class Optimizer(Enum):
     RMSProp = 0
     SGD = 1
+    Adam = 2
+    Adagrad = 3
 
 class Loss(Enum):
     MSE = 0
@@ -49,11 +53,26 @@ session = tf.Session(config=config)
 
 window_size = 60
 
+def r2_score(y_true, y_pred):
+    SS_res =  K.sum(K.square(y_true - y_pred))
+    SS_tot = K.sum(K.square(y_true - K.mean(y_true)))
+    return ( 1 - SS_res/(SS_tot + K.epsilon()) )
+
 def getOptimizer(optimizer, lr, momentum):
-    if optimizer == 0:
-        return RMSprop(lr = lr)
-    else:
-        return SGD()
+    if optimizer == Optimizer.RMSProp:
+        return RMSprop(lr=lr)
+    elif optimizer == Optimizer.SGD:
+        return SGD(lr=lr, momentum=momentum)
+    elif optimizer == Optimizer.Adam:
+        return Adam(lr=lr)
+    elif optimizer == Optimizer.Adagrad:
+        return Adagrad(lr=lr)
+
+def getLoss(loss):
+    if loss == Loss.MSE:
+        return mean_squared_error
+    elif loss == Loss.R2:
+        return r2_score
 
 def getModel(X_train, architecture, isCuda):
     if architecture == Architecture.LSTM.value:
@@ -132,7 +151,44 @@ def getModel(X_train, architecture, isCuda):
             regressorGRU.add(Dense(units=1))
             return regressorGRU
 
-
+    elif architecture == Architecture.BidirectionalLSTM:
+        if isCuda:
+            # Bidirectional Model
+            regressorBidirection = Sequential()
+            # First Bidirectional LSTM Layer
+            regressorBidirection.add(Bidirectional(CuDNNLSTM(units=50, return_sequences=True), input_shape=(X_train.shape[1],1)))
+            regressorBidirection.add(Dropout(0.2))
+            # Second Bidirectional LSTM layer
+            regressorBidirection.add(Bidirectional(CuDNNLSTM(units=50, return_sequences=True)))
+            regressorBidirection.add(Dropout(0.2))
+            # Third Bidirectional LSTM layer
+            regressorBidirection.add(Bidirectional(CuDNNLSTM(units=50, return_sequences=True)))
+            regressorBidirection.add(Dropout(0.2))
+            # Fourth Bidirectional LSTM layer
+            regressorBidirection.add(Bidirectional(CuDNNLSTM(units=50)))
+            regressorBidirection.add(Dropout(0.2))
+            # The output layer
+            regressorBidirection.add(Dense(units=1))
+            return regressorBidirection
+        else:
+            # Bidirectional Model
+            regressorBidirection = Sequential()
+            # First Bidirectional LSTM Layer
+            regressorBidirection.add(Bidirectional(LSTM(units=50, return_sequences=True), input_shape=(X_train.shape[1],1)))
+            regressorBidirection.add(Dropout(0.2))
+            # Second Bidirectional LSTM layer
+            regressorBidirection.add(Bidirectional(LSTM(units=50, return_sequences=True)))
+            regressorBidirection.add(Dropout(0.2))
+            # Third Bidirectional LSTM layer
+            regressorBidirection.add(Bidirectional(LSTM(units=50, return_sequences=True)))
+            regressorBidirection.add(Dropout(0.2))
+            # Fourth Bidirectional LSTM layer
+            regressorBidirection.add(Bidirectional(LSTM(units=50)))
+            regressorBidirection.add(Dropout(0.2))
+            # The output layer
+            regressorBidirection.add(Dense(units=1))
+            return regressorBidirection
+        
 def getScaledData(training_set, scale, file_name):
 
     sc = MinMaxScaler(feature_range=(0,1))
@@ -164,13 +220,8 @@ def save_plot(test,predicted, file_name):
     plt.ylabel('Stock Price')
     plt.legend()
     plt.savefig(file_name + '.jpg')
-
-def r2_score(y_true, y_pred):
-    SS_res =  K.sum(K.square(y_true - y_pred)) 
-    SS_tot = K.sum(K.square(y_true - K.mean(y_true))) 
-    return ( 1 - SS_res/(SS_tot + K.epsilon()) )
     
-def train(training_set, date, lr, scale, epochs, momentum, optimizer, file_name, architecture):
+def train(training_set, date, lr, scale, epochs, momentum, optimizer, loss, file_name, architecture):
     if(type(training_set) == list and type(date) == list):
 
         # Constructing a pandas dataframe for reusability and reference
@@ -188,8 +239,8 @@ def train(training_set, date, lr, scale, epochs, momentum, optimizer, file_name,
         regressor = getModel(X_train, architecture, tf.test.is_gpu_available())
 
         # Compiling the RNN
-        regressor.compile(optimizer=getOptimizer(optimizer, lr, momentum), loss='mean_squared_error', metrics=['mse',r2_score])
-            
+        regressor.compile(optimizer=getOptimizer(optimizer, lr, momentum), loss=getLoss(loss), metrics=['mse',r2_score])
+           
         # Fitting to the training set
         hist = regressor.fit(X_train, Y_train,epochs = epochs, batch_size=32)
 
@@ -242,7 +293,7 @@ def test(testing_set, date, file_name):
         predicted_stock_price = regressor.predict(X_test)
         predicted_stock_price = scaler.inverse_transform(predicted_stock_price)
 
-        save_plot(test_set, predicted_stock_price, file_name)
+        #save_plot(test_set, predicted_stock_price, file_name)
 
         eval = regressor.evaluate(X_test, scaler.transform(test_set.reshape(-1,1)))
 
