@@ -39,8 +39,9 @@ enum Loss   {
 //| Input Parameters                                                 |
 //+------------------------------------------------------------------+
 
-input Optimizer optimizer = RMSProp; // Optimizer
+
 input Architecture architecture = LSTM; // RNN Architecture
+input Optimizer optimizer = RMSProp; // Optimizer
 input Loss loss = MSE; // Loss Function
 
 input bool gpu = true; // Allow GPU Computations ?
@@ -54,7 +55,7 @@ input int scale = 100; // Scale
 
 input string fileName = "model1"; // File Name to export model
 
-input double momentum = 0.1; // Momentum (for SGD)
+input double momentum = 0.9; // Momentum (for SGD)
 input double learningRate = 0.001; // Learning Rate 
 
 input double testingPart = 10; // Percentage of Train/Test Split
