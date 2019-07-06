@@ -118,7 +118,7 @@ def getModel(X_train, architecture, isCuda):
             # The GRU architecture
             regressorGRU = Sequential()
             # First GRU layer with Dropout regularisation
-            regressorGRU.add(CuDNNGRU(units=50, return_sequences=True, input_shape=(X_train.shape[1],1)))
+            regressorGRU.add(CuDNNGRU(units=50, return_sequences=True, input_shape=(X_train.shape[1])))
             regressorGRU.add(Dropout(0.2))
             # Second GRU layer
             regressorGRU.add(CuDNNGRU(units=50, return_sequences=True, input_shape=(X_train.shape[1],1)))
@@ -136,16 +136,16 @@ def getModel(X_train, architecture, isCuda):
             # The GRU architecture
             regressorGRU = Sequential()
             # First GRU layer with Dropout regularisation
-            regressorGRU.add(GRU(units=50, return_sequences=True, input_shape=(X_train.shape[1],1), activation='tanh'))
+            regressorGRU.add(GRU(units=50, return_sequences=True, input_shape=(X_train.shape[1],1)))
             regressorGRU.add(Dropout(0.2))
             # Second GRU layer
-            regressorGRU.add(GRU(units=50, return_sequences=True, input_shape=(X_train.shape[1],1), activation='tanh'))
+            regressorGRU.add(GRU(units=50, return_sequences=True, input_shape=(X_train.shape[1],1)))
             regressorGRU.add(Dropout(0.2))
             # Third GRU layer
-            regressorGRU.add(GRU(units=50, return_sequences=True, input_shape=(X_train.shape[1],1), activation='tanh'))
+            regressorGRU.add(GRU(units=50, return_sequences=True, input_shape=(X_train.shape[1],1)))
             regressorGRU.add(Dropout(0.2))
             # Fourth GRU layer
-            regressorGRU.add(GRU(units=50, activation='tanh'))
+            regressorGRU.add(GRU(units=50))
             regressorGRU.add(Dropout(0.2))
             # The output layer
             regressorGRU.add(Dense(units=1))
@@ -188,6 +188,45 @@ def getModel(X_train, architecture, isCuda):
             # The output layer
             regressorBidirection.add(Dense(units=1))
             return regressorBidirection
+
+    elif architecture == Architecture.BidirectionalGRU:
+        if isCuda:
+            # Bidirectional Model
+            regressorBidirection = Sequential()
+            # First Bidirectional LSTM Layer
+            regressorBidirection.add(Bidirectional(CuDNNGRU(units=50, return_sequences=True),input_shape=(X_train.shape[1],1)))
+            regressorBidirection.add(Dropout(0.2))
+            # Second Bidirectional LSTM layer
+            regressorBidirection.add(Bidirectional(CuDNNGRU(units=50, return_sequences=True),input_shape=(X_train.shape[1],1)))
+            regressorBidirection.add(Dropout(0.2))
+            # Third Bidirectional LSTM layer
+            regressorBidirection.add(Bidirectional(CuDNNGRU(units=50, return_sequences=True),input_shape=(X_train.shape[1],1)))
+            regressorBidirection.add(Dropout(0.2))
+            # Fourth Bidirectional LSTM layer
+            regressorBidirection.add(Bidirectional(CuDNNGRU(units=50)))
+            regressorBidirection.add(Dropout(0.2))
+            # The output layer
+            regressorBidirection.add(Dense(units=1))
+            return regressorBidirection
+        else:
+            # Bidirectional Model
+            regressorBidirection = Sequential()
+            # First Bidirectional LSTM Layer
+            regressorBidirection.add(Bidirectional(GRU(units=50, return_sequences=True),input_shape=(X_train.shape[1],1)))
+            regressorBidirection.add(Dropout(0.2))
+            # Second Bidirectional LSTM layer
+            regressorBidirection.add(Bidirectional(GRU(units=50, return_sequences=True),input_shape=(X_train.shape[1],1)))
+            regressorBidirection.add(Dropout(0.2))
+            # Third Bidirectional LSTM layer
+            regressorBidirection.add(Bidirectional(GRU(units=50, return_sequences=True),input_shape=(X_train.shape[1],1)))
+            regressorBidirection.add(Dropout(0.2))
+            # Fourth Bidirectional LSTM layer
+            regressorBidirection.add(Bidirectional(GRU(units=50)))
+            regressorBidirection.add(Dropout(0.2))
+            # The output layer
+            regressorBidirection.add(Dense(units=1))
+            return regressorBidirection
+
         
 def getScaledData(training_set, scale, file_name):
 
