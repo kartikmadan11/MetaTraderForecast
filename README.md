@@ -6,7 +6,7 @@ MQL based Expert Advisors are attached to chart to make RNN based predictions. A
 
 ## Recurrent Neural Network Specs
 The various parameter that can be opted for tuning the ML model are -
-### Options for RNN Architecture
+### RNN Architecture
 - **Long Short Term Memory** 
 - **Gated Recurrent Units**
 - **Bidirectional LSTM**
@@ -48,7 +48,7 @@ If tensorflow-gpu is present, run the following commands to check
 - Tensorflow 1.14 or higher
 - Keras
 
-**FOR GPU Support**
+**For GPU Support**
 
 - tensorflow-gpu
 - CUDA 9.0 or higher (10.0 recommended)
