@@ -46,8 +46,8 @@ If tensorflow-gpu is present, run the following commands to check
 
 **FOR GPU Support**
 
-- Tensorflow-gpu
-- CUDA 9.0 or higher(10.0 recommended)
+- tensorflow-gpu
+- CUDA 9.0 or higher (10.0 recommended)
 - cuDNN Library v7.4 or higher
 
 ### Workflow
