@@ -39,10 +39,10 @@ To install tensorflow-gpu use python package manager
 `pip install tensorflow-gpu`
 
 If tensorflow-gpu is present, run the following commands to check
-
-`import tensorflow as tf`
-
-`tf.test.is_gpu_available()`
+```python
+import tensorflow as tf
+tf.test.is_gpu_available()
+```
 ### Dependencies
 - Python 3.6 or higher (dev versions not recommended, use stable releases)
 - Tensorflow 1.14 or higher
