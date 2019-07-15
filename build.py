@@ -59,19 +59,19 @@ def r2_score(y_true, y_pred):
     return ( 1 - SS_res/(SS_tot + K.epsilon()) )
 
 def getOptimizer(optimizer, lr, momentum):
-    if optimizer == Optimizer.RMSProp:
+    if optimizer == Optimizer.RMSProp.value:
         return RMSprop(lr=lr)
-    elif optimizer == Optimizer.SGD:
+    elif optimizer == Optimizer.SGD.value:
         return SGD(lr=lr, momentum=momentum)
-    elif optimizer == Optimizer.Adam:
+    elif optimizer == Optimizer.Adam.value:
         return Adam(lr=lr)
-    elif optimizer == Optimizer.Adagrad:
+    elif optimizer == Optimizer.Adagrad.value:
         return Adagrad(lr=lr)
 
 def getLoss(loss):
-    if loss == Loss.MSE:
-        return mean_squared_error
-    elif loss == Loss.R2:
+    if loss == Loss.MSE.value:
+        return 'mean_squared_error'
+    elif loss == Loss.R2.value:
         return r2_score
 
 def getModel(X_train, architecture, isCuda):
@@ -151,7 +151,7 @@ def getModel(X_train, architecture, isCuda):
             regressorGRU.add(Dense(units=1))
             return regressorGRU
 
-    elif architecture == Architecture.BidirectionalLSTM:
+    elif architecture == Architecture.BidirectionalLSTM.value:
         if isCuda:
             # Bidirectional Model
             regressorBidirection = Sequential()
@@ -189,7 +189,7 @@ def getModel(X_train, architecture, isCuda):
             regressorBidirection.add(Dense(units=1))
             return regressorBidirection
 
-    elif architecture == Architecture.BidirectionalGRU:
+    elif architecture == Architecture.BidirectionalGRU.value:
         if isCuda:
             # Bidirectional Model
             regressorBidirection = Sequential()
