@@ -260,7 +260,7 @@ def save_plot(test,predicted, file_name):
     plt.legend()
     plt.savefig(file_name + '.jpg')
     
-def train(training_set, date, lr, scale, epochs, momentum, optimizer, loss, file_name, architecture):
+def train(training_set, date, lr, scale, epochs, momentum, optimizer, loss, file_name, architecture, cuda):
     if(type(training_set) == list and type(date) == list):
 
         # Constructing a pandas dataframe for reusability and reference
@@ -275,7 +275,7 @@ def train(training_set, date, lr, scale, epochs, momentum, optimizer, loss, file
         X_train, Y_train = getScaledData(training_set, scale, file_name)
         
         # Constructing a stacked LSTM Sequential Model
-        regressor = getModel(X_train, architecture, tf.test.is_gpu_available())
+        regressor = getModel(X_train, architecture, tf.test.is_gpu_available() if cuda else False)
 
         # Compiling the RNN
         regressor.compile(optimizer=getOptimizer(optimizer, lr, momentum), loss=getLoss(loss), metrics=['mse',r2_score])
