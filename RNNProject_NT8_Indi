@@ -23,46 +23,14 @@ using System.Net;
 using System.Net.Sockets;
 using Newtonsoft.Json;
 using System.Dynamic;
-using System.Runtime.Serialization;
 #endregion
 
 //This namespace holds Indicators in this folder and is required. Do not change it. 
 namespace NinjaTrader.NinjaScript.Indicators
 {
-	public class __HPCS_RNNProject_NT8_Indi_V01_WE : Indicator
+	public class __RNNProject_NT8_Indi_V02_WE : Indicator
 	{
-		protected override void OnStateChange()
-		{
-			if (State == State.SetDefaults)
-			{
-				Description									= @"RNN Project predictor";
-				Name										= "__HPCS_RNNProject_NT8_Indi_V01_WE";
-				Calculate									= Calculate.OnBarClose;
-				IsOverlay									= false;
-				DisplayInDataBox							= true;
-				DrawOnPricePanel							= true;
-				DrawHorizontalGridLines						= true;
-				DrawVerticalGridLines						= true;
-				PaintPriceMarkers							= true;
-				ScaleJustification							= NinjaTrader.Gui.Chart.ScaleJustification.Right;
-				//Disable this property if your indicator requires custom values that cumulate with each new market data event. 
-				//See Help Guide for additional information.
-				IsSuspendedWhileInactive					= true;
-			}
-			else if (State == State.Configure)
-			{
-				
-			}
-			
-			else if(State == State.Terminated)
-			{
-				//stream.Close();
-				//socket.Close();
-			}
-			
-		}
-		
-	    #region Enum Declaration
+		#region Enum Declaration
 		   public enum Optimizer {
 			  RMSProp,
 			  SGD,
@@ -84,35 +52,60 @@ namespace NinjaTrader.NinjaScript.Indicators
 		#endregion
 		
 		#region Private Variables
-			private Architecture architecture = Architecture.LSTM; // RNN Architecture
+		    private Architecture architecture = Architecture.LSTM; // RNN Architecture
 		    private Optimizer optimizer  = Optimizer.RMSProp; // Optimizer
 		    private Loss loss = Loss.MSE;
 			
-			private bool gpu = true; // Allow GPU Computations ?
-			private bool train = true; // Train ?
+		    private bool gpu = true; // Allow GPU Computations ?
+		    private bool train = true; // Train ?
 
-			private bool isTrained = false;
-			//Train size must be greater than window_size = 60
-			private int trainingSize = 500 ; // Train Size 
-			private int epochs = 10;  // Epochs
-			private int scale = 100; // Scale
+		    private bool isTrained = false;
+		    //Train size must be greater than window_size = 60
+		    private int trainingSize = 500 ; // Train Size 
+		    private int epochs = 10;  // Epochs
+		    private int scale = 100; // Scale
 						
-			private string fileName = "model1"; // File Name to export model
+		    private string fileName = "model1"; // File Name to export model
 
-			private double momentum = 0.9; // Momentum (for SGD)
-			private double learningRate = 0.001; // Learning Rate 
-			private double testingPart = 10; // Percentage of Train/Test Split
-			private double testingWeight = 50; // Percentage of Train/Test Score Weights
+		    private double momentum = 0.9; // Momentum (for SGD)
+		    private double learningRate = 0.001; // Learning Rate 
+		    private double testingPart = 10; // Percentage of Train/Test Split
+		    private double testingWeight = 50; // Percentage of Train/Test Score Weights
             				
-			private int bars = 5;
+		    private int bars = 5;
+		    private int prevTrain = 0;
+		    private int retrainInterval = 10;
 			
 		    public TcpClient socket;
-			public NetworkStream stream;
+		    public NetworkStream stream;
 		#endregion
+		
+		protected override void OnStateChange()
+		{
+			if (State == State.SetDefaults)
+			{
+				Description									= @"Includes retraining od data";
+				Name										= "__RNNProject_NT8_Indi_V02_WE";
+				Calculate									= Calculate.OnBarClose;
+				IsOverlay									= false;
+				DisplayInDataBox							= true;
+				DrawOnPricePanel							= true;
+				DrawHorizontalGridLines						= true;
+				DrawVerticalGridLines						= true;
+				PaintPriceMarkers							= true;
+				ScaleJustification							= NinjaTrader.Gui.Chart.ScaleJustification.Right;
+				//Disable this property if your indicator requires custom values that cumulate with each new market data event. 
+				//See Help Guide for additional information.
+				IsSuspendedWhileInactive					= true;
+			}
+			else if (State == State.Configure)
+			{
+			}
+		}
 
 		protected override void OnBarUpdate()
 		{
-			//Print(State.ToString());
+			Print(State.ToString());
 			// For Running on Real Time Data
 			if(State == State.Historical)
 				return;
@@ -120,9 +113,11 @@ namespace NinjaTrader.NinjaScript.Indicators
 			// Collect Enough Data
 			if (CurrentBar < trainingSize)
 				return;
-
+			
+			int interval = CurrentBar - prevTrain;
+			
 			// Training the model
-			if (!isTrained)
+			if (!isTrained || (isTrained && interval == retrainInterval))
 			{
 				// Establishing connection				
 				socket = new TcpClient();
@@ -168,7 +163,7 @@ namespace NinjaTrader.NinjaScript.Indicators
 					Print("Sent : " + jsonString);
 
 					isTrained = true;
-
+					prevTrain = CurrentBar;
 				}	
 				
 				else
@@ -208,10 +203,8 @@ namespace NinjaTrader.NinjaScript.Indicators
 				
 				else
 					Print("Socket Disconnected! ");
-								
-			}
+		}
 		
-	
 		#region Properties
 			[Display(Name = "Architecture", Order = 0, Description="")]
 			public Architecture m_architecture
@@ -269,48 +262,56 @@ namespace NinjaTrader.NinjaScript.Indicators
 				set{scale = value;}
 			}
 			
-			[Display(Name = "bars", Order = 8, Description="")]
+			[Display(Name = "Bars to Predict", Order = 8, Description="")]
 			public int m_bars
 			{
 				get {return bars;}
 				set{bars = value;}
 			}
 			
-			[Display(Name = "momentum", Order = 9, Description="")]
+			[Display(Name = "Retrain Interval(in bars)", Order = 9, Description="")]
+			public int m_retrainInterval
+			{
+				get {return retrainInterval;}
+				set{retrainInterval = value;}
+			}
+			
+			[Display(Name = "Momentum", Order = 10, Description="")]
 			public double m_momentum
 			{
 				get {return momentum;}
 				set{momentum = value;}
 			}
 			
-			[Display(Name = "learningRate",  Order = 10, Description="")]
+			[Display(Name = "Learning Rate",  Order = 11, Description="")]
 			public double m_learningRate
 			{
 				get {return learningRate;}
 				set{learningRate = value;}
 			}
 			
-			[Display(Name = "testingPart",  Order = 11, Description="")]
+			[Display(Name = "Testing Part",  Order = 12, Description="")]
 			public double m_testingPart
 			{
 				get {return testingPart ;}
 				set{ testingPart = value;}
 			}
 			
-			[Display(Name = "testingWeight",  Order = 12,Description="")]
+			[Display(Name = "TestingWeight",  Order = 13,Description="")]
 			public double m_testingWeight
 			{
 				get {return testingWeight;}
 				set{testingWeight = value;}
 			}
 			
-			[Display(Name = "fileName", Order = 13, Description="")]
+			[Display(Name = "fileName", Order = 14, Description="")]
 			public string m_fileName
 			{
 				get {return fileName;}
 				set {fileName = value;}
 			}
 		#endregion
+		
 	}
 }
 
@@ -320,19 +321,19 @@ namespace NinjaTrader.NinjaScript.Indicators
 {
 	public partial class Indicator : NinjaTrader.Gui.NinjaScript.IndicatorRenderBase
 	{
-		private __HPCS_RNNProject_NT8_Indi_V01_WE[] cache__HPCS_RNNProject_NT8_Indi_V01_WE;
-		public __HPCS_RNNProject_NT8_Indi_V01_WE __HPCS_RNNProject_NT8_Indi_V01_WE()
+		private __RNNProject_NT8_Indi_V02_WE[] cache__RNNProject_NT8_Indi_V02_WE;
+		public __RNNProject_NT8_Indi_V02_WE __RNNProject_NT8_Indi_V02_WE()
 		{
-			return __HPCS_RNNProject_NT8_Indi_V01_WE(Input);
+			return __RNNProject_NT8_Indi_V02_WE(Input);
 		}
 
-		public __HPCS_RNNProject_NT8_Indi_V01_WE __HPCS_RNNProject_NT8_Indi_V01_WE(ISeries<double> input)
+		public __RNNProject_NT8_Indi_V02_WE __RNNProject_NT8_Indi_V02_WE(ISeries<double> input)
 		{
-			if (cache__HPCS_RNNProject_NT8_Indi_V01_WE != null)
-				for (int idx = 0; idx < cache__HPCS_RNNProject_NT8_Indi_V01_WE.Length; idx++)
-					if (cache__HPCS_RNNProject_NT8_Indi_V01_WE[idx] != null &&  cache__HPCS_RNNProject_NT8_Indi_V01_WE[idx].EqualsInput(input))
-						return cache__HPCS_RNNProject_NT8_Indi_V01_WE[idx];
-			return CacheIndicator<__HPCS_RNNProject_NT8_Indi_V01_WE>(new __HPCS_RNNProject_NT8_Indi_V01_WE(), input, ref cache__HPCS_RNNProject_NT8_Indi_V01_WE);
+			if (cache__RNNProject_NT8_Indi_V02_WE != null)
+				for (int idx = 0; idx < cache__RNNProject_NT8_Indi_V02_WE.Length; idx++)
+					if (cache__RNNProject_NT8_Indi_V02_WE[idx] != null &&  cache__RNNProject_NT8_Indi_V02_WE[idx].EqualsInput(input))
+						return cache__RNNProject_NT8_Indi_V02_WE[idx];
+			return CacheIndicator<__RNNProject_NT8_Indi_V02_WE>(new __RNNProject_NT8_Indi_V02_WE(), input, ref cache__RNNProject_NT8_Indi_V02_WE);
 		}
 	}
 }
@@ -341,14 +342,14 @@ namespace NinjaTrader.NinjaScript.MarketAnalyzerColumns
 {
 	public partial class MarketAnalyzerColumn : MarketAnalyzerColumnBase
 	{
-		public Indicators.__HPCS_RNNProject_NT8_Indi_V01_WE __HPCS_RNNProject_NT8_Indi_V01_WE()
+		public Indicators.__RNNProject_NT8_Indi_V02_WE __RNNProject_NT8_Indi_V02_WE()
 		{
-			return indicator.__HPCS_RNNProject_NT8_Indi_V01_WE(Input);
+			return indicator.__RNNProject_NT8_Indi_V02_WE(Input);
 		}
 
-		public Indicators.__HPCS_RNNProject_NT8_Indi_V01_WE __HPCS_RNNProject_NT8_Indi_V01_WE(ISeries<double> input )
+		public Indicators.__RNNProject_NT8_Indi_V02_WE __RNNProject_NT8_Indi_V02_WE(ISeries<double> input )
 		{
-			return indicator.__HPCS_RNNProject_NT8_Indi_V01_WE(input);
+			return indicator.__RNNProject_NT8_Indi_V02_WE(input);
 		}
 	}
 }
@@ -357,14 +358,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
 	public partial class Strategy : NinjaTrader.Gui.NinjaScript.StrategyRenderBase
 	{
-		public Indicators.__HPCS_RNNProject_NT8_Indi_V01_WE __HPCS_RNNProject_NT8_Indi_V01_WE()
+		public Indicators.__RNNProject_NT8_Indi_V02_WE __RNNProject_NT8_Indi_V02_WE()
 		{
-			return indicator.__HPCS_RNNProject_NT8_Indi_V01_WE(Input);
+			return indicator.__RNNProject_NT8_Indi_V02_WE(Input);
 		}
 
-		public Indicators.__HPCS_RNNProject_NT8_Indi_V01_WE __HPCS_RNNProject_NT8_Indi_V01_WE(ISeries<double> input )
+		public Indicators.__RNNProject_NT8_Indi_V02_WE __RNNProject_NT8_Indi_V02_WE(ISeries<double> input )
 		{
-			return indicator.__HPCS_RNNProject_NT8_Indi_V01_WE(input);
+			return indicator.__RNNProject_NT8_Indi_V02_WE(input);
 		}
 	}
 }
