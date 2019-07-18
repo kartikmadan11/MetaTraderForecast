@@ -72,9 +72,9 @@ namespace NinjaTrader.NinjaScript.Indicators
 		    private double testingPart = 10; // Percentage of Train/Test Split
 		    private double testingWeight = 50; // Percentage of Train/Test Score Weights
             				
-		    private int bars = 5;
-		    private int prevTrain = 0;
-		    private int retrainInterval = 10;
+		    private int bars = 5;  // Bars to forecast
+		    private int prevTrain = 0;  // Index of last bar trained
+		    private int retrainInterval = 10;  // Retrain after this interval
 			
 		    public TcpClient socket;
 		    public NetworkStream stream;

@@ -57,7 +57,7 @@ namespace NinjaTrader.Indicator
 		private int prevTrain       = 0;
 		private int retrainInterval = 10;
 			
-		    // For Connection with socket
+		// For Connection with socket
 		public TcpClient socket;
 		public NetworkStream stream;
 
@@ -130,7 +130,7 @@ namespace NinjaTrader.Indicator
 			stream = socket.GetStream();
 
 			if (socket.Connected)
-	                {
+	            {
 				Print("connected!");
 
 				List<string> closePrice = new List<string>();
@@ -195,7 +195,7 @@ namespace NinjaTrader.Indicator
 				jsonObject = JsonConvert.DeserializeObject<PredictionParameters>(response);
 
 				// Plotting the predictions on the chart
-				for (int i=-1;i>=-5;i--)
+				for (int i=-1;i>=-1*bars;i--)
 				{
 					double ypred = double.Parse(jsonObject.Pred[(-1*i)-1].ToString());
 					DrawDot("Prediction " + i.ToString(), true, i, ypred, Color.Cyan);
