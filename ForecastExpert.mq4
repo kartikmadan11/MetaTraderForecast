@@ -1,5 +1,5 @@
 //+------------------------------------------------------------------+
-//|                                                socket_tester.mq4 |
+//|                                                 ForestExpert.mq4 |
 //|                        Copyright 2019, MetaQuotes Software Corp. |
 //|                                             https://www.mql5.com |
 //+------------------------------------------------------------------+
@@ -201,6 +201,9 @@ void OnTick()
             } 
             else{
                Print("Client connection failed");
+               delete socket;
+               socket = NULL;
+               return;
             }
             Print("Connected to "," localhost",":",9090);
                   
@@ -264,6 +267,10 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
          } 
          else{
             Print("Client connection failed");
+            ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_STATE,false);
+            delete socket;
+            socket = NULL;
+            return;
          }
          Print("Connected to "," localhost",":",9090);
                

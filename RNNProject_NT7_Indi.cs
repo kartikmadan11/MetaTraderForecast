@@ -34,21 +34,21 @@ namespace NinjaTrader.Indicator
 		private E_Optimizer optimizer  = E_Optimizer.RMSProp; // Optimizer
 		private E_Loss loss = E_Loss.MSE;
 			
-		private bool gpu = true; // Allow GPU Computations ?
-		private bool train = true; // Train ?
+		private bool gpu    = true; // Allow GPU Computations ?
+		private bool train  = true; // Train ?
 
 		private bool isTrained = false;
 
 		//Train size must be greater than window_size = 60
 		private int trainingSize = 500 ; // Train Size 
-		private int epochs = 10;  // Epochs
-		private int scale = 100; // Scale
+		private int epochs       = 10;  // Epochs
+		private int scale        = 100; // Scale
 
 		private string fileName = "model1"; // File Name to export model
 
-		private double momentum = 0.9; // Momentum (for SGD)
-		private double learningRate = 0.001; // Learning Rate 
-		private double testingPart = 10; // Percentage of Train/Test Split
+		private double momentum      = 0.9; // Momentum (for SGD)
+		private double learningRate  = 0.001; // Learning Rate 
+		private double testingPart   = 10; // Percentage of Train/Test Split
 		private double testingWeight = 50; // Percentage of Train/Test Score Weights
 
 		private int bars            = 5;
@@ -176,42 +176,47 @@ namespace NinjaTrader.Indicator
 		// Receiving data after training from the server  
 		else if(socket.Connected)
 		{
-			byte[] data = new Byte[2*256];
-			string response = "";
-			Int32 bytes = stream.Read(data, 0, data.Length);
-			if(bytes > 0)
-			response += Encoding.UTF8.GetString(data,0,bytes);
+			if(stream.DataAvailable)
+			{
+				byte[] data = new Byte[2*256];
+				string response = "";
+				Int32 bytes = stream.Read(data, 0, data.Length);
+				if(bytes > 1)
+				response = Encoding.UTF8.GetString(data,0,bytes);
 
-			if(response != "")
-		        { 
-				Print("Received : " + response);
-				var jsonObject = new PredictionParameters();
+				if(response != "")
+				{ 
+					Print("Received : " + response);
+					var jsonObject = new PredictionParameters();
 
-				// Deserializing JSON data 
-				jsonObject = JsonConvert.DeserializeObject<PredictionParameters>(response);
+					// Deserializing JSON data 
+					jsonObject = JsonConvert.DeserializeObject<PredictionParameters>(response);
 
-				// Plotting the predictions on the chart
-				for (int i=-1;i>=-1*bars;i--)
-				{
-					double ypred = double.Parse(jsonObject.Pred[(-1*i)-1].ToString());
-					DrawDot("Prediction " + i.ToString(), true, i, ypred, Color.Cyan);
+					// Plotting the predictions on the chart
+					for (int i=-1;i>=-1*bars;i--)
+					{
+						double ypred = double.Parse(jsonObject.Pred[(-1*i)-1].ToString());
+						DrawDot("Prediction " + i.ToString(), true, i, ypred, Color.Cyan);
 
-				} 
-						
-				// closing the socket
-				stream.Close();
-				socket.Close();
+					} 
+
+					// closing the socket
+					stream.Close();
+					socket.Close();
+				}
+				else
+					Print("Not Received!");
 			}
-			else
-				Print("Not Received");
-		}
-		
+			else 
+				Print("Prediction Not Available!");
+		}		
 		else
 			Print("Socket Disconnected! ");
         }
 
         #region Properties
-		[Description("Architecture")]
+		
+		[Description("Architecture of the Training Model")]
 		[Category("Model Parameters")]
 	        public E_Architecture Architecture
 		{
@@ -219,7 +224,7 @@ namespace NinjaTrader.Indicator
 		    set { architecture = value; }
 		}
 		
-		[Description("")]
+		[Description("Optimizer to be Used")]
 		[Category("Model Parameters")]
 		public E_Optimizer Optimizer
 		{
@@ -227,7 +232,7 @@ namespace NinjaTrader.Indicator
 		    set { optimizer = value; }
 		}
 
-		[Description("")]
+		[Description("Loss Function")]
 		[Category("Model Parameters")]
 		public E_Loss Loss
 		{
@@ -235,7 +240,7 @@ namespace NinjaTrader.Indicator
 		    set { loss = value; }
 		}
 
-		[Description("")]
+		[Description("If GPU is enabled")]
 		[Category("Model Parameters")]
 		public bool Gpu
 		{
@@ -243,7 +248,7 @@ namespace NinjaTrader.Indicator
 			set{gpu = value;}
 		}
 
-		[Description("")]
+		[Description("If training is enabled")]
 		[Category("Model Parameters")]
 		public bool Train
 		{
@@ -251,7 +256,7 @@ namespace NinjaTrader.Indicator
 			set{train = value;}
 		}
 
-		[Description("")]
+		[Description("Size of data to be sent for training")]
 		[Category("Model Parameters")]
 		public int Training_Size
 		{
@@ -259,7 +264,7 @@ namespace NinjaTrader.Indicator
 			set{ trainingSize = value;}
 		}
 
-		[Description("")]
+		[Description("Epochs")]
 		[Category("Model Parameters")]
 		public int Epochs
 		{
@@ -267,7 +272,7 @@ namespace NinjaTrader.Indicator
 			set{epochs = value;}
 		}
 
-		[Description("")]
+		[Description("Scaling Parameter")]
 		[Category("Model Parameters")]
 		public int Scale
 		{
@@ -275,7 +280,7 @@ namespace NinjaTrader.Indicator
 			set{scale = value;}
 		}
 
-		[Description("")]
+		[Description("Number of future bars to predict")]
 		[Category("Model Parameters")]
 		public int Bars_To_Predict
 		{
@@ -283,7 +288,7 @@ namespace NinjaTrader.Indicator
 			set{bars = value;}
 		}
 
-		[Description("")]
+		[Description("Momentum")]
 		[Category("Model Parameters")]
 		public double Momentum
 		{
@@ -291,7 +296,7 @@ namespace NinjaTrader.Indicator
 			set{momentum = value;}
 		}
 
-		[Description("")]
+		[Description("Learning Rate for the model")]
 		[Category("Model Parameters")]
 		public double Learning_Rate
 		{
@@ -299,7 +304,7 @@ namespace NinjaTrader.Indicator
 			set{learningRate = value;}
 		}
 
-		[Description("")]
+		[Description("Train/Test data split (in percentage)")]
 		[Category("Model Parameters")]
 		public double Testing_Part
 		{
@@ -307,7 +312,7 @@ namespace NinjaTrader.Indicator
 			set{ testingPart = value;}
 		}
 
-		[Description("")]
+		[Description("Train/Test score(in percentage)")]
 		[Category("Model Parameters")]
 		public double Testing_Weight
 		{
@@ -315,7 +320,7 @@ namespace NinjaTrader.Indicator
 			set{testingWeight = value;}
 		}
 
-		[Description("")]
+		[Description("Name of file to store Model")]
 		[Category("Model Parameters")]
 		public string FileName
 		{
@@ -323,7 +328,7 @@ namespace NinjaTrader.Indicator
 			set {fileName = value;}
 		}
 		
-		[Description("")]
+		[Description("The Number Of Bars after which to retrain")]
 		[Category("Model Parameters")]
 		public int Retrain_Interval
 		{
@@ -335,26 +340,29 @@ namespace NinjaTrader.Indicator
     }
 }
 
-	    #region Enum Declaration
-		   public enum E_Optimizer {
-			  RMSProp,
-			  SGD,
-			  Adam,
-			  Adagrad
-			};
+	#region Enum Declaration
+		public enum E_Optimizer
+		{
+		  RMSProp,
+		  SGD,
+		  Adam,
+		  Adagrad
+		};
 			  
-			public enum E_Architecture {
-			  LSTM,
-			  GRU,
-			  BidirectionalLSTM,
-			  BidirectionalGRU
-			};
-			 
-			public enum E_Loss   {
-			   MSE,
-			   R2
-			};
-		#endregion
+		public enum E_Architecture 
+		{
+		  LSTM,
+		  GRU,
+		  BidirectionalLSTM,
+		  BidirectionalGRU
+		};
+
+		public enum E_Loss   
+		{
+		   MSE,
+		   R2
+		};
+	#endregion
 
 #region NinjaScript generated code. Neither change nor remove.
 // This namespace holds all indicators and is required. Do not change it.
