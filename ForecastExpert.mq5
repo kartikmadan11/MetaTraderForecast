@@ -189,12 +189,7 @@ void OnDeinit(const int reason)
 {
 //---   
    SocketClose(socket);
-   for(int i=0;i<bars;i++)
-   {
-      ObjectDelete(ChartID(),"pred" + IntegerToString(i + 1));
-   }   
-   ObjectDelete(ChartID(),"Trainbutton");
-   ObjectDelete(ChartID(),"Predbutton");
+   ObjectsDeleteAll(ChartID(),-1,-1);
    
 }
 //+------------------------------------------------------------------+
@@ -248,11 +243,15 @@ void OnTick()
                   Print("Data Sent Successfully For Retrain.");
                 
             }
-            else 
-               Print("Connection ","localhost",":",9090," error ",GetLastError());     
-            }
-         else 
-            Print("Socket creation error ",GetLastError()); 
+            else{
+               socket = -2;
+               Print("Error in connecting to ","localhost",":",9090,"  Error  :  ",GetLastError());
+            }     
+         }
+         else{
+            socket = -2;
+            Print("Socket creation error ",GetLastError());
+         } 
          
       }
       else{
@@ -279,8 +278,6 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
       if(socket == -2){
      
          previousTime = iTime(ChartSymbol(ChartID()),Period(),0);
-         
-         Print(previousTime);
          socket = SocketCreate();
          if(socket!=INVALID_HANDLE) {
             if(SocketConnect(socket,"localhost",9090,1000)) {
@@ -319,12 +316,15 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                   Print("Data Sent Successfully.");
                 
             }
-            else 
-               Print("Connection ","localhost",":",9090," error ",GetLastError());     
-            }
-         else 
+            else{
+               socket = -2; 
+               Print("Error in connecting to ","localhost",":",9090,"  Error  :  ",GetLastError()); 
+            }    
+         }
+         else{
+            socket = -2; 
             Print("Socket creation error ",GetLastError()); 
-         
+         }
       }
       else{
       
