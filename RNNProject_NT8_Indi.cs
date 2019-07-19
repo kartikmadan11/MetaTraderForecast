@@ -83,7 +83,7 @@ namespace NinjaTrader.NinjaScript.Indicators
 
 		public TcpClient socket;                  // Creating client for connection via socket
 		public NetworkStream stream;              // NetworkStream variable to read and write data
-		
+
 		#endregion
 		
 		protected override void OnStateChange()
@@ -91,9 +91,9 @@ namespace NinjaTrader.NinjaScript.Indicators
 			if (State == State.SetDefaults)
 			{
 				Description							= @"Includes retraining od data";
-				Name								= "__RNNProject_NT8_Indi_V02_WE";
-				Calculate							= Calculate.OnBarClose;
-				IsOverlay							= false;
+				Name								    = "__RNNProject_NT8_Indi_V02_WE";
+				Calculate							  = Calculate.OnBarClose;
+				IsOverlay							  = false;
 				DisplayInDataBox						= true;
 				DrawOnPricePanel						= true;
 				DrawHorizontalGridLines						= true;
@@ -103,8 +103,8 @@ namespace NinjaTrader.NinjaScript.Indicators
 				//Disable this property if your indicator requires custom values that cumulate with each new market data event. 
 				//See Help Guide for additional information.
 				IsSuspendedWhileInactive					= true;
-				
-			}
+			
+      }
 			else if (State == State.Configure)
 			{
 			}
@@ -137,22 +137,22 @@ namespace NinjaTrader.NinjaScript.Indicators
 				stream = socket.GetStream();                // Creating stream to read and write data
 
 				if (socket.Connected)
-	           		{
-	                		Print("connected!");
-						
+	      {
+	        Print("connected!");
+                      
 					// Collecting close Price and Dates data
 					List<string> closePrice = new List<string>();
 					List<string> time = new List<string>();
 					for (int index = 0; index < trainingSize; index++) 
-				    	{
+
+				    {
 						 closePrice.Add(Close[index].ToString() );	
 						 time.Add(Time[index].ToString());
-				    	}
-					
-					
+				    }
+
 					// Creating dynamic object to store model parameters
 					dynamic jsonObject = new ExpandoObject();				
-					
+
 					jsonObject.Data          = closePrice;
 					jsonObject.Time          = time;
 					jsonObject.FileName      = fileName;
@@ -181,23 +181,23 @@ namespace NinjaTrader.NinjaScript.Indicators
 				}	
 				
 				else
-			     	{
-				   Print("connection failed!");
-			     	}
+			  {
+				    Print("connection failed!");
+			   }
 			 }
 			 // Receiving result from trained model
 			 if(socket.Connected)
 			 {
-				if (DEBUG) Print("Can Read : " + stream.CanRead.ToString());
+				  if (DEBUG) Print("Can Read : " + stream.CanRead.ToString());
 			  	if (DEBUG) Print("Is Data Available : " + stream.DataAvailable.ToString());
 				 
 				 if(stream.DataAvailable)
 				 {
-					//socket.ReceiveTimeout = 20000;
-					byte[] data     = new Byte[2*256];
-		            		string response = string.Empty;
-		            		Int32 bytes     = stream.Read(data, 0, data.Length);
-		            		response        = Encoding.UTF8.GetString(data,0,bytes);
+					  //socket.ReceiveTimeout = 20000;
+					  byte[] data     = new Byte[2*256];
+		        string response = string.Empty;
+		     		Int32 bytes     = stream.Read(data, 0, data.Length);
+		     		response        = Encoding.UTF8.GetString(data,0,bytes);
 
 					if(response != string.Empty)
 		            		{ 
@@ -215,7 +215,7 @@ namespace NinjaTrader.NinjaScript.Indicators
 						} 
 	
 						stream.Close();
-				        	socket.Close();
+           	socket.Close();
 					}
 				 }
 				 else
@@ -241,56 +241,56 @@ namespace NinjaTrader.NinjaScript.Indicators
 				get { return optimizer; }
 			    set { optimizer = value; }
 			}
-			
+
 			[Display(Name = "Loss", Order = 2, Description="Loss Function")]
 			public Loss m_loss
 			{
 				get { return loss; }
 			    set { loss = value; }
 			}
-			
+
 			[Display(Name = "GPU",  Order = 3,Description="If GPU is enabled")]
 			public bool m_gpu
 			{
 				get {return gpu;}
 				set{gpu = value;}
 			}
-			
+
 			[Display(Name = "Train",  Order = 4, Description="If training is enabled")]
 			public bool m_train
 			{
 				get {return train;}
 				set{train = value;}
 			}
-			
+
 			[Display(Name = "Training Size",  Order = 5, Description="Size of data to be sent for training")]
 			public int m_trainingSize
 			{
 				get {return trainingSize;}
 				set{ trainingSize = value;}
 			}
-			
+
 			[Display(Name = "Epochs",  Order = 6, Description="Epochs")]
 			public int m_epochs
 			{
 				get {return epochs;}
 				set{epochs = value;}
 			}
-			
+
 			[Display(Name = "Scale", Order = 7, Description="Scaling Parameter")]
 			public int m_scale
 			{
 				get {return scale;}
 				set{scale = value;}
 			}
-			
+
 			[Display(Name = "Bars to Predict", Order = 8, Description="Number of future bars to predict")]
 			public int m_bars
 			{
 				get {return bars;}
 				set{bars = value;}
 			}
-			
+
 			[Display(Name = "Retrain Interval(in bars)", Order = 9, Description="Interval after which to automatically retrain")]
 			public int m_retrainInterval
 			{
@@ -298,13 +298,14 @@ namespace NinjaTrader.NinjaScript.Indicators
 				set{retrainInterval = value;}
 			}
 			
+
 			[Display(Name = "Momentum", Order = 10, Description="Momentum")]
 			public double m_momentum
 			{
 				get {return momentum;}
 				set{momentum = value;}
 			}
-			
+
 			[Display(Name = "Learning Rate",  Order = 11, Description="Learning Rate for the model")]
 			public double m_learningRate
 			{
@@ -312,20 +313,20 @@ namespace NinjaTrader.NinjaScript.Indicators
 				set{learningRate = value;}
 			}
 			
-			[Display(Name = "Testing Part",  Order = 12, Description="Train/Test data split (in percentage)")]
+      [Display(Name = "Testing Part",  Order = 12, Description="Train/Test data split (in percentage)")]
 			public double m_testingPart
 			{
 				get {return testingPart ;}
 				set{ testingPart = value;}
 			}
-			
+
 			[Display(Name = "Testing Weight",  Order = 13,Description="Train/Test score(in percentage)")]
 			public double m_testingWeight
 			{
 				get {return testingWeight;}
 				set{testingWeight = value;}
 			}
-			
+
 			[Display(Name = "fileName", Order = 14, Description="Name of file to store Model")]
 			public string m_fileName
 			{

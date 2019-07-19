@@ -1,11 +1,20 @@
 //+------------------------------------------------------------------+
-//|                                               ForecastExpert.mq5 |
-//|                                                             HPCS |
+//|                                                 ForestExpert.mq4 |
+//|                        Copyright 2019, MetaQuotes Software Corp. |
 //|                                             https://www.mql5.com |
 //+------------------------------------------------------------------+
-#property copyright "HPCS"
+#property copyright "Copyright 2019, MetaQuotes Software Corp."
 #property link      "https://www.mql5.com"
 #property version   "1.00"
+#property strict
+
+
+//+----------------------------------------------------------------------------------+
+//| Header file for socket library,JSON Serialization and Deserialization            |
+//+----------------------------------------------------------------------------------+
+
+#include <socket-library-mt4-mt5.mqh>
+#include <JAson.mqh>
 
 //+------------------------------------------------------------------+
 //| Enumerated Parameters                                            |
@@ -27,18 +36,11 @@ enum Architecture {
 enum Loss   {
    MSE,
    R2,
-}; 
-//+------------------------------------------------------------------+
-//| Expert initialization function                                   |
-//+------------------------------------------------------------------+
-
-// Header file for JSON Serialization and Deserialization
-#include <JAson.mqh>
+};
 
 //+------------------------------------------------------------------+
 //| Input Parameters                                                 |
 //+------------------------------------------------------------------+
-
 
 input Architecture architecture = LSTM; // RNN Architecture
 input Optimizer optimizer = RMSProp; // Optimizer
@@ -64,7 +66,7 @@ input double testingWeight = 50; // Percentage of Train/Test Score Weights
 input int retrain = 10; // Retrain bar
 input int bars = 5; // Future bars to predict
 
-int socket = -2; // Socket Variable 
+ClientSocket * socket = NULL;
 int count = 0;
 datetime previousTime;
 string previousPred;
@@ -74,9 +76,9 @@ string previousPred;
 //+------------------------------------------------------------------+
 
 bool onRetrainBar(void){
-         
-   if(previousTime != iTime(ChartSymbol(ChartID()),Period(),0)){
-      previousTime = iTime(ChartSymbol(ChartID()),Period(),0); 
+
+   if(previousTime != Time[0]){
+      previousTime = Time[0]; 
       count++;
    }
    if(count == retrain){
@@ -86,40 +88,9 @@ bool onRetrainBar(void){
    return false;
 }
 
-// Socket Send Function
-bool socksend(int sock,string request) {
-   char req[];
-   int  len=StringToCharArray(request,req)-1;
-   if(len<0) 
-      return(false);
-   return(SocketSend(sock,req,len)==len); 
-}
 
-// Socket Receive Function
-string socketreceive(int sock,int timeout)   {
-   char rsp[];
-   string result="";
-   uint len;
-   uint timeout_check=GetTickCount()+timeout;
-   do
-   {
-      len=SocketIsReadable(sock);
-      if(len)
-      {
-         int rsp_len;
-         rsp_len=SocketRead(sock,rsp,len,timeout);
-         if(rsp_len>0) 
-         {
-            result+=CharArrayToString(rsp,0,rsp_len); 
-         }
-      }
-   }
-   while((GetTickCount()<timeout_check) && !IsStopped());
-   return result;
-}
 
-void drawpred(string res)
-{
+void drawlr(string res){
    CJAVal json;
    if(!json.Deserialize(res)) {
       Print("BAD RESPONSE !!");
@@ -134,7 +105,7 @@ void drawpred(string res)
    
    for(int i=0;i<bars;i++)
    {
-      predictions[i] = NormalizeDouble(StringToDouble(json["Pred"][i].ToStr()), Digits());
+      predictions[i] = NormalizeDouble(StringToDouble(json["Pred"][i].ToStr()), Digits);
       //Print(predictions[i]);
       //Print(TimeCurrent() + ChartPeriod(0)*60*(i+1));
       ObjectCreate(0, "pred" + IntegerToString(i + 1),OBJ_ARROW, 0, TimeCurrent() + ChartPeriod(0)*60*(i+1),  predictions[i]);
@@ -144,10 +115,15 @@ void drawpred(string res)
    }
 }
 
-int OnInit()
-{
-//---
 
+//+------------------------------------------------------------------+
+//| Expert initialization function                                   |
+//+------------------------------------------------------------------+
+int OnInit()
+  {
+//---
+   
+   //EventSetTimer(10);
    previousPred = "";
    
    ObjectCreate(ChartID(),"Trainbutton",OBJ_BUTTON,0,0,0);
@@ -157,7 +133,7 @@ int OnInit()
    ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_YDISTANCE,10);
    ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_COLOR,clrBlue);
    ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_BGCOLOR,clrWhite);
-   ObjectSetString(ChartID(),"Trainbutton",OBJPROP_TEXT,"TRAIN MODEL");
+   ObjectSetText("Trainbutton","Train Model",10,NULL,clrBlue);
    ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_STATE,false);
 
    ObjectCreate(ChartID(),"Predbutton",OBJ_BUTTON,0,0,0);
@@ -167,7 +143,7 @@ int OnInit()
    ObjectSetInteger(ChartID(),"Predbutton",OBJPROP_YDISTANCE,50);
    ObjectSetInteger(ChartID(),"Predbutton",OBJPROP_COLOR,clrBlue);
    ObjectSetInteger(ChartID(),"Predbutton",OBJPROP_BGCOLOR,clrWhite);
-   ObjectSetString(ChartID(),"Predbutton",OBJPROP_TEXT,"PREDICT");
+   ObjectSetText("Predbutton","Predict",10,NULL,clrBlue);
    ObjectSetInteger(ChartID(),"Predbutton",OBJPROP_STATE,false);   
    
    if(!EventChartCustom(ChartID(),0,0,0,"Trainbutton")){
@@ -176,82 +152,158 @@ int OnInit()
    
    if(!EventChartCustom(ChartID(),0,0,0,"Predbutton")){
       Print("Error : ",GetLastError());
-   }
+   }     
    
-         
+   
 //---
    return(INIT_SUCCEEDED);
-}
+  }
 //+------------------------------------------------------------------+
 //| Expert deinitialization function                                 |
 //+------------------------------------------------------------------+
-void OnDeinit(const int reason)
-{
-//---   
-   SocketClose(socket);
-   ObjectsDeleteAll(ChartID(),-1,-1);
+
+
+void OnTimer(){
+
    
+
 }
+
+
+void OnDeinit(const int reason)
+  {
+//---
+   
+   for(int i=0;i<bars;i++)
+   {
+      ObjectDelete(ChartID(),"pred" + IntegerToString(i + 1));
+   }
+   ObjectDelete(ChartID(),"Trainbutton");
+   ObjectDelete(ChartID(),"Predbutton");
+   //EventKillTimer();
+   delete socket;   
+   
+  }
 //+------------------------------------------------------------------+
 //| Expert tick function                                             |
 //+------------------------------------------------------------------+
 void OnTick()
-{
+  {
 //---
-
-   if(onRetrainBar()){
-   
-      //Print("Inside onRetrainBar.");
-   
-      if(socket == -2){
+      if(onRetrainBar()){
       
-         socket = SocketCreate();
-         if(socket!=INVALID_HANDLE) {
-            if(SocketConnect(socket,"localhost",9090,1000)) {
-               Print("Connected to "," localhost",":",9090);
-                  
-               double clpr[];
-               int copyClose = CopyClose(ChartSymbol(ChartID()),PERIOD_CURRENT,0,trainingSize,clpr);
-               
-               datetime time[];
-               int copyTime = CopyTime(ChartSymbol(ChartID()),PERIOD_CURRENT,0,trainingSize,time);
-               
-               CJAVal json;
-               for (int i = 0; i < ArraySize(clpr); i++)
-               {
-                  json["Data"].Add(DoubleToString(clpr[i], 6));
-                  json["Time"].Add((string)time[i]);         
-               }
-               
-               json["FileName"] = fileName;
-               json["GPU"] = gpu;
-               json["Architecture"] = (int)architecture;
-               json["Optimizer"] = (int)optimizer;
-               json["Loss"] = (int)loss;
-               json["LearningRate"] = learningRate;
-               json["Epochs"] = epochs;
-               json["Scale"] = scale;
-               json["Momentum"] = momentum;
-               json["TestingPart"] = testingPart;
-               json["TestingWeight"] = testingWeight;
-               json["Bars"] = bars;
-               
-               string jsonString = json.Serialize();
-       
-               bool send = socksend(socket, jsonString);
-               if(send)
-                  Print("Data Sent Successfully For Retrain.");
-                
-            }
+         if(!socket){  
+            
+            socket = new ClientSocket("localhost",9090);
+            
+            if (socket.IsSocketConnected()){
+               Print("Client connection succeeded");
+            } 
             else{
-               socket = -2;
-               Print("Error in connecting to ","localhost",":",9090,"  Error  :  ",GetLastError());
-            }     
+               Print("Client connection failed");
+               delete socket;
+               socket = NULL;
+               return;
+            }
+            Print("Connected to "," localhost",":",9090);
+                  
+            double clpr[];
+            int copyed = CopyClose(ChartSymbol(ChartID()),ChartPeriod(ChartID()),0,trainingSize,clpr);
+                  
+            datetime time[];
+            int copyTime = CopyTime(_Symbol,PERIOD_CURRENT,0,trainingSize,time);
+            
+            CJAVal json;
+            for (int i = 0; i < ArraySize(clpr); i++)
+            {
+               json["Data"].Add(DoubleToString(clpr[i], 6));
+               json["Time"].Add((string)time[i]);         
+            }
+            
+            json["FileName"] = fileName;
+            json["GPU"] = gpu;
+            json["Architecture"] = (int)architecture;
+            json["Optimizer"] = (int)optimizer;
+            json["Loss"] = (int)loss;
+            json["LearningRate"] = learningRate;
+            json["Epochs"] = epochs;
+            json["Scale"] = scale;
+            json["Momentum"] = momentum;
+            json["TestingPart"] = testingPart;
+            json["TestingWeight"] = testingWeight;
+            json["Bars"] = bars;
+            
+            string jsonString = json.Serialize();
+            if(socket.Send(jsonString)){
+               Print("Data sent successfully for Retrain.");
+            }                
+            
          }
          else{
-            socket = -2;
-            Print("Socket creation error ",GetLastError());
+         
+            Print("Socket Is Busy.");
+         
+         }   
+      
+      }
+  }
+  
+//+------------------------------------------------------------------+
+//| Expert event function                                            |
+//+------------------------------------------------------------------+  
+
+void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam){
+
+   if(id == CHARTEVENT_OBJECT_CLICK && sparam == "Trainbutton"){
+      
+      if(!socket){  
+         
+         previousTime = Time[0];
+         
+         socket = new ClientSocket("localhost",9090);
+         
+         if (socket.IsSocketConnected()){
+            Print("Client connection succeeded");
          } 
+         else{
+            Print("Client connection failed");
+            ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_STATE,false);
+            delete socket;
+            socket = NULL;
+            return;
+         }
+         Print("Connected to "," localhost",":",9090);
+               
+         double clpr[];
+         int copyed = CopyClose(ChartSymbol(ChartID()),ChartPeriod(ChartID()),0,trainingSize,clpr);
+               
+         datetime time[];
+         int copyTime = CopyTime(_Symbol,PERIOD_CURRENT,0,trainingSize,time);
+         
+         CJAVal json;
+         for (int i = 0; i < ArraySize(clpr); i++)
+         {
+            json["Data"].Add(DoubleToString(clpr[i], 6));
+            json["Time"].Add((string)time[i]);         
+         }
+         
+         json["FileName"] = fileName;
+         json["GPU"] = gpu;
+         json["Architecture"] = (int)architecture;
+         json["Optimizer"] = (int)optimizer;
+         json["Loss"] = (int)loss;
+         json["LearningRate"] = learningRate;
+         json["Epochs"] = epochs;
+         json["Scale"] = scale;
+         json["Momentum"] = momentum;
+         json["TestingPart"] = testingPart;
+         json["TestingWeight"] = testingWeight;
+         json["Bars"] = bars;
+         
+         string jsonString = json.Serialize();
+         if(socket.Send(jsonString)){
+            Print("Data sent successfully for Training.");
+         }          
          
       }
       else{
@@ -259,89 +311,18 @@ void OnTick()
          Print("Socket Is Busy.");
       
       }
-   
-   }
 
-
-} 
-//+------------------------------------------------------------------+
-
-void OnTimer(){
-
-}
-
-
-void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam){
-
-   if(id == CHARTEVENT_OBJECT_CLICK && sparam == "Trainbutton"){
-   
-      if(socket == -2){
-     
-         previousTime = iTime(ChartSymbol(ChartID()),Period(),0);
-         socket = SocketCreate();
-         if(socket!=INVALID_HANDLE) {
-            if(SocketConnect(socket,"localhost",9090,1000)) {
-               Print("Connected to "," localhost",":",9090);
-                   
-               double clpr[];
-               int copyClose = CopyClose(_Symbol,PERIOD_CURRENT,0,trainingSize,clpr);
-               
-               datetime time[];
-               int copyTime= CopyTime(_Symbol,PERIOD_CURRENT,0,trainingSize,time);
-               
-               CJAVal json;
-               for (int i = 0; i < ArraySize(clpr); i++)
-               {
-                  json["Data"].Add(DoubleToString(clpr[i], 6));
-                  json["Time"].Add((string)time[i]);         
-               }
-               
-               json["FileName"] = fileName;
-               json["GPU"] = gpu;
-               json["Architecture"] = (int)architecture;
-               json["Optimizer"] = (int)optimizer;
-               json["Loss"] = (int)loss;
-               json["LearningRate"] = learningRate;
-               json["Epochs"] = epochs;
-               json["Scale"] = scale;
-               json["Momentum"] = momentum;
-               json["TestingPart"] = testingPart;
-               json["TestingWeight"] = testingWeight;
-               json["Bars"] = bars;
-               
-               string jsonString = json.Serialize();
-               //Print(jsonString);
-               bool send = socksend(socket, jsonString);
-               if(send)
-                  Print("Data Sent Successfully.");
-                
-            }
-            else{
-               socket = -2; 
-               Print("Error in connecting to ","localhost",":",9090,"  Error  :  ",GetLastError()); 
-            }    
-         }
-         else{
-            socket = -2; 
-            Print("Socket creation error ",GetLastError()); 
-         }
-      }
-      else{
-      
-         Print("Socket Is Busy In Training.");
-      
-      }
       ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_STATE,false);
-   
+      
    }
    
    if(id == CHARTEVENT_OBJECT_CLICK && sparam == "Predbutton"){
    
-      if(socket==-2){
+      if(socket==NULL){
          
          if(previousPred != ""){
             Print("Based on previously trained model, Prediction are : ",previousPred);
-            drawpred(previousPred);
+            drawlr(previousPred);
          }
          else{
             Print("No predicted data is available or Model is still getting trained.");
@@ -353,31 +334,36 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
       }
       string strMessage;
       do{
-         strMessage = socketreceive(socket,10);
+         strMessage = socket.Receive("\r\n");
          if (strMessage != "") {
             previousPred = strMessage;
             Print(strMessage);
-            drawpred(strMessage);
-            SocketClose(socket);
-            socket = -2;
+            drawlr(strMessage);
+            delete socket;
+            socket = NULL;
          }
          else{
          
             if(previousPred != ""){
                Print("Based on previously trained model, Prediction are : ",previousPred);
-               drawpred(previousPred);
+               drawlr(previousPred);
             }
             else{
                Print("No predicted data available or Model is still getting trained.");
             }
          
          }
-      }while(socket != -2 && strMessage != "");   
+      }while(socket && strMessage != "");   
       
       ObjectSetInteger(ChartID(),"Predbutton",OBJPROP_STATE,false);
-   
-   }
+      
+   }   
 
 }
-
+  
+  
+  
 //+------------------------------------------------------------------+
+
+
+
