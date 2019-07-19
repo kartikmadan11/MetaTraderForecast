@@ -27,8 +27,6 @@ namespace NinjaTrader.Indicator
     [Description("Indicator for RNN Project ")]
     public class RNNProject_NT7_Indi : Indicator
     {
-	
-		
         #region Variables
         // Wizard generated variables
         // User defined variables (add any user defined variables below)
@@ -167,9 +165,7 @@ namespace NinjaTrader.Indicator
 				Print("Sent : " + jsonString);
 
 				isTrained = true;
-				prevTrain = CurrentBar;
-					
-
+				prevTrain = CurrentBar;				
 			}	
 				
 			else
