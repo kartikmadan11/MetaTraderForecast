@@ -1,5 +1,5 @@
 //+------------------------------------------------------------------+
-//|                                               ForecastExpert.mq5 |
+//|                               _HPCS_RNNPredict_MT5_EA_V01_WE.mq5 |
 //|                                                             HPCS |
 //|                                             https://www.mql5.com |
 //+------------------------------------------------------------------+
@@ -149,35 +149,78 @@ int OnInit()
 //---
 
    previousPred = "";
+   if(train == true){
+      ObjectCreate(ChartID(),"Trainbutton",OBJ_BUTTON,0,0,0);
+      ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_XSIZE,140);
+      ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_YSIZE,30);
+      ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_XDISTANCE,40);
+      ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_YDISTANCE,10);
+      ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_COLOR,clrBlue);
+      ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_BGCOLOR,clrWhite);
+      ObjectSetString(ChartID(),"Trainbutton",OBJPROP_TEXT,"TRAIN MODEL");
+      ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_STATE,false);
    
-   ObjectCreate(ChartID(),"Trainbutton",OBJ_BUTTON,0,0,0);
-   ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_XSIZE,140);
-   ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_YSIZE,30);
-   ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_XDISTANCE,40);
-   ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_YDISTANCE,10);
-   ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_COLOR,clrBlue);
-   ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_BGCOLOR,clrWhite);
-   ObjectSetString(ChartID(),"Trainbutton",OBJPROP_TEXT,"TRAIN MODEL");
-   ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_STATE,false);
-
-   ObjectCreate(ChartID(),"Predbutton",OBJ_BUTTON,0,0,0);
-   ObjectSetInteger(ChartID(),"Predbutton",OBJPROP_XSIZE,140);
-   ObjectSetInteger(ChartID(),"Predbutton",OBJPROP_YSIZE,30);
-   ObjectSetInteger(ChartID(),"Predbutton",OBJPROP_XDISTANCE,40);
-   ObjectSetInteger(ChartID(),"Predbutton",OBJPROP_YDISTANCE,50);
-   ObjectSetInteger(ChartID(),"Predbutton",OBJPROP_COLOR,clrBlue);
-   ObjectSetInteger(ChartID(),"Predbutton",OBJPROP_BGCOLOR,clrWhite);
-   ObjectSetString(ChartID(),"Predbutton",OBJPROP_TEXT,"PREDICT");
-   ObjectSetInteger(ChartID(),"Predbutton",OBJPROP_STATE,false);   
-   
-   if(!EventChartCustom(ChartID(),0,0,0,"Trainbutton")){
-      Print("Error : ",GetLastError());
-   }   
-   
-   if(!EventChartCustom(ChartID(),0,0,0,"Predbutton")){
-      Print("Error : ",GetLastError());
+      ObjectCreate(ChartID(),"Predbutton",OBJ_BUTTON,0,0,0);
+      ObjectSetInteger(ChartID(),"Predbutton",OBJPROP_XSIZE,140);
+      ObjectSetInteger(ChartID(),"Predbutton",OBJPROP_YSIZE,30);
+      ObjectSetInteger(ChartID(),"Predbutton",OBJPROP_XDISTANCE,40);
+      ObjectSetInteger(ChartID(),"Predbutton",OBJPROP_YDISTANCE,50);
+      ObjectSetInteger(ChartID(),"Predbutton",OBJPROP_COLOR,clrBlue);
+      ObjectSetInteger(ChartID(),"Predbutton",OBJPROP_BGCOLOR,clrWhite);
+      ObjectSetString(ChartID(),"Predbutton",OBJPROP_TEXT,"PREDICT");
+      ObjectSetInteger(ChartID(),"Predbutton",OBJPROP_STATE,false);   
+      
+      if(!EventChartCustom(ChartID(),0,0,0,"Trainbutton")){
+         Print("Error : ",GetLastError());
+      }   
+      
+      if(!EventChartCustom(ChartID(),0,0,0,"Predbutton")){
+         Print("Error : ",GetLastError());
+      }
    }
+   else{
    
+      socket = SocketCreate();
+      if(socket!=INVALID_HANDLE) {
+         if(SocketConnect(socket,"localhost",9090,1000)) {
+            Print("Connected to "," localhost",":",9090);
+            
+            CJAVal json;
+            json["FileName"] = fileName;
+            json["Train"] = train;
+            json["GPU"] = gpu;
+            json["Bars"] = bars;
+            
+            string jsonString = json.Serialize();
+    
+            bool send = socksend(socket, jsonString);
+            if(send)
+               Print("Data Sent Successfully For Prediction.");
+               
+            string strMessage;
+            do{
+               strMessage = socketreceive(socket,10);
+               if (strMessage != "") {
+                  previousPred = strMessage;
+                  Print(strMessage);
+                  drawpred(strMessage);
+                  SocketClose(socket);
+                  socket = -2;
+               }
+            }while(strMessage == "");  
+             
+         }
+         else{
+            socket = -2;
+            Print("Error in connecting to ","localhost",":",9090,"  Error  :  ",GetLastError());
+         }     
+      }
+      else{
+         socket = -2;
+         Print("Socket creation error ",GetLastError());
+      }
+      
+   }
          
 //---
    return(INIT_SUCCEEDED);
@@ -224,6 +267,7 @@ void OnTick()
                }
                
                json["FileName"] = fileName;
+               json["Train"] = train;
                json["GPU"] = gpu;
                json["Architecture"] = (int)architecture;
                json["Optimizer"] = (int)optimizer;
@@ -297,6 +341,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                }
                
                json["FileName"] = fileName;
+               json["Train"] = train;
                json["GPU"] = gpu;
                json["Architecture"] = (int)architecture;
                json["Optimizer"] = (int)optimizer;
