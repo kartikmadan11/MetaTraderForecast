@@ -15,9 +15,16 @@ def train_test_model(msg = ''):
     else:
         return "BAD JSON!!"
     
-    data = input_data['Data']
-    date = input_data['Time']
     file_name = input_data['FileName']
+    if(input_data['Train'] == False):
+        pred = build.predict(file_name, input_data['Bars'])
+        print(pred)
+        responseJSON = {}
+        responseJSON['Pred'] = pred
+        return json.dumps(responseJSON)+"\r\n"    
+    
+    data = input_data['Data']
+    date = input_data['Time']    
     
     testSize = int(input_data['TestingPart'] / 100 * len(data))
     trainSize = len(data) - testSize
@@ -37,7 +44,7 @@ def train_test_model(msg = ''):
     responseJSON['Eval'] = evaluate
     responseJSON['Pred'] = pred
 
-    return json.dumps(responseJSON)
+    return json.dumps(responseJSON) + "\r\n"
 
 class socketserver:
     def __init__(self, address = '', port = 9090):
