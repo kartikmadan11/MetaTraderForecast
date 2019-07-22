@@ -1,0 +1,9 @@
+[submodule "include/pywipe"]
+	path = include/pywipe
+	url = https://github.com/magiciankartik/pywpipe
+[submodule "include/include/pywpipe"]
+	path = include/include/pywpipe
+	url = https://github.com/magiciankartik/pywpipe
+[submodule "include/pywpipe"]
+	path = include/pywpipe
+	url = https://github.com/magiciankartik/pywpipe
