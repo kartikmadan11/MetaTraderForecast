@@ -21,7 +21,7 @@ def train_test_model(msg = ''):
         print(pred)
         responseJSON = {}
         responseJSON['Pred'] = pred
-        return json.dumps(responseJSON)+"\r\n"    
+        return json.dumps(responseJSON)+"\r\n"
     
     data = input_data['Data']
     date = input_data['Time']    
