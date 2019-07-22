@@ -1,5 +1,5 @@
 //+------------------------------------------------------------------+
-//|                                                 ForestExpert.mq4 |
+//|                               _HPCS_RNNPredict_MT4_EA_V01_WE.mq4 |
 //|                        Copyright 2019, MetaQuotes Software Corp. |
 //|                                             https://www.mql5.com |
 //+------------------------------------------------------------------+
@@ -125,34 +125,72 @@ int OnInit()
    
    //EventSetTimer(10);
    previousPred = "";
+   if(train == true){
+      ObjectCreate(ChartID(),"Trainbutton",OBJ_BUTTON,0,0,0);
+      ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_XSIZE,140);
+      ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_YSIZE,30);
+      ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_XDISTANCE,40);
+      ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_YDISTANCE,10);
+      ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_COLOR,clrBlue);
+      ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_BGCOLOR,clrWhite);
+      ObjectSetText("Trainbutton","Train Model",10,NULL,clrBlue);
+      ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_STATE,false);
    
-   ObjectCreate(ChartID(),"Trainbutton",OBJ_BUTTON,0,0,0);
-   ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_XSIZE,140);
-   ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_YSIZE,30);
-   ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_XDISTANCE,40);
-   ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_YDISTANCE,10);
-   ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_COLOR,clrBlue);
-   ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_BGCOLOR,clrWhite);
-   ObjectSetText("Trainbutton","Train Model",10,NULL,clrBlue);
-   ObjectSetInteger(ChartID(),"Trainbutton",OBJPROP_STATE,false);
-
-   ObjectCreate(ChartID(),"Predbutton",OBJ_BUTTON,0,0,0);
-   ObjectSetInteger(ChartID(),"Predbutton",OBJPROP_XSIZE,140);
-   ObjectSetInteger(ChartID(),"Predbutton",OBJPROP_YSIZE,30);
-   ObjectSetInteger(ChartID(),"Predbutton",OBJPROP_XDISTANCE,40);
-   ObjectSetInteger(ChartID(),"Predbutton",OBJPROP_YDISTANCE,50);
-   ObjectSetInteger(ChartID(),"Predbutton",OBJPROP_COLOR,clrBlue);
-   ObjectSetInteger(ChartID(),"Predbutton",OBJPROP_BGCOLOR,clrWhite);
-   ObjectSetText("Predbutton","Predict",10,NULL,clrBlue);
-   ObjectSetInteger(ChartID(),"Predbutton",OBJPROP_STATE,false);   
-   
-   if(!EventChartCustom(ChartID(),0,0,0,"Trainbutton")){
-      Print("Error : ",GetLastError());
-   }   
-   
-   if(!EventChartCustom(ChartID(),0,0,0,"Predbutton")){
-      Print("Error : ",GetLastError());
-   }     
+      ObjectCreate(ChartID(),"Predbutton",OBJ_BUTTON,0,0,0);
+      ObjectSetInteger(ChartID(),"Predbutton",OBJPROP_XSIZE,140);
+      ObjectSetInteger(ChartID(),"Predbutton",OBJPROP_YSIZE,30);
+      ObjectSetInteger(ChartID(),"Predbutton",OBJPROP_XDISTANCE,40);
+      ObjectSetInteger(ChartID(),"Predbutton",OBJPROP_YDISTANCE,50);
+      ObjectSetInteger(ChartID(),"Predbutton",OBJPROP_COLOR,clrBlue);
+      ObjectSetInteger(ChartID(),"Predbutton",OBJPROP_BGCOLOR,clrWhite);
+      ObjectSetText("Predbutton","Predict",10,NULL,clrBlue);
+      ObjectSetInteger(ChartID(),"Predbutton",OBJPROP_STATE,false);   
+      
+      if(!EventChartCustom(ChartID(),0,0,0,"Trainbutton")){
+         Print("Error : ",GetLastError());
+      }   
+      
+      if(!EventChartCustom(ChartID(),0,0,0,"Predbutton")){
+         Print("Error : ",GetLastError());
+      }
+   }
+   else{
+      
+      socket = new ClientSocket("localhost",9090);
+            
+      if (socket.IsSocketConnected()){
+         Print("Client connection succeeded");
+      } 
+      else{
+         Print("Client connection failed");
+         ExpertRemove();
+         return(INIT_SUCCEEDED);
+      }
+      Print("Connected to "," localhost",":",9090);
+      CJAVal json;
+      json["FileName"] = fileName;
+      json["Train"] = train;
+      json["Bars"] = bars;
+      string jsonString = json.Serialize();
+      
+      if(socket.Send(jsonString)){
+         Print("Data sent successfully for Prediction.");
+      }
+      
+      string strMessage;
+      do{
+         strMessage = socket.Receive("\r\n");
+         if (strMessage != "") {
+            previousPred = strMessage;
+            Print(strMessage);
+            drawlr(strMessage);
+            delete socket;
+            socket = NULL;
+         }
+      }while(socket && strMessage == "");
+      delete socket;
+      //ExpertRemove();
+   }        
    
    
 //---
@@ -221,6 +259,7 @@ void OnTick()
             }
             
             json["FileName"] = fileName;
+            json["Train"] = train;
             json["GPU"] = gpu;
             json["Architecture"] = (int)architecture;
             json["Optimizer"] = (int)optimizer;
@@ -288,6 +327,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
          }
          
          json["FileName"] = fileName;
+         json["Train"] = train;
          json["GPU"] = gpu;
          json["Architecture"] = (int)architecture;
          json["Optimizer"] = (int)optimizer;
@@ -303,8 +343,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
          string jsonString = json.Serialize();
          if(socket.Send(jsonString)){
             Print("Data sent successfully for Training.");
-         }          
-         
+         }  
       }
       else{
       
