@@ -72,7 +72,8 @@ namespace NinjaTrader.Indicator
 			public string FileName {get; set;}
 
 			public bool GPU {get; set;}
-	
+			public bool Train {get; set;}
+
 			public int Architecture {get; set;}
 			public int Optimizer {get; set;}
 			public int Loss{get; set;}
@@ -146,6 +147,7 @@ namespace NinjaTrader.Indicator
 				jsonObject.Time = time;
 				jsonObject.FileName = fileName;
 				jsonObject.GPU = gpu;
+				jsonObject.Train = train;
 				jsonObject.Architecture = (int)architecture;
 				jsonObject.Optimizer = (int)optimizer;
 				jsonObject.Loss = (int)loss;

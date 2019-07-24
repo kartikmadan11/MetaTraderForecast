@@ -157,6 +157,7 @@ namespace NinjaTrader.NinjaScript.Indicators
 					jsonObject.Time          = time;
 					jsonObject.FileName      = fileName;
 					jsonObject.GPU           = gpu;
+					jsonObject.Train 		 = train;
 					jsonObject.Architecture  = (int)architecture;
 					jsonObject.Optimizer     = (int)optimizer;
 					jsonObject.Loss          = (int)loss;
