@@ -1,19 +1,19 @@
 #region Using declarations
 using System;
 using System.ComponentModel;
-using System.Diagnostics;
+//using System.Diagnostics;
 using System.Drawing;
-using System.Drawing.Drawing2D;
-using System.Xml.Serialization;
-using NinjaTrader.Cbi;
-using NinjaTrader.Data;
-using NinjaTrader.Gui.Chart;
-using System.Net;
+//using System.Drawing.Drawing2D;
+//using System.Xml.Serialization;
+//using NinjaTrader.Cbi;
+//using NinjaTrader.Data;
+//using NinjaTrader.Gui.Chart;
+//using System.Net;
 using System.Net.Sockets;
 using System.Runtime.Serialization;
 using Newtonsoft.Json;
 
-using System.ServiceModel.Web;
+//using System.ServiceModel.Web;
 using System.Collections.Generic;
 using System.Text;
 #endregion
@@ -27,37 +27,39 @@ namespace NinjaTrader.Indicator
     [Description("Indicator for RNN Project ")]
     public class RNNProject_NT7_Indi : Indicator
     {
+	
         #region Variables
         // Wizard generated variables
         // User defined variables (add any user defined variables below)
-		private E_Architecture architecture = E_Architecture.LSTM; // RNN Architecture
-		private E_Optimizer optimizer  = E_Optimizer.RMSProp; // Optimizer
-		private E_Loss loss = E_Loss.MSE;
+			private E_Architecture architecture = E_Architecture.LSTM; // RNN Architecture
+		    private E_Optimizer optimizer       = E_Optimizer.RMSProp; // Optimizer
+		    private E_Loss loss                 = E_Loss.MSE;          // Loss Function
 			
-		private bool gpu    = true; // Allow GPU Computations ?
-		private bool train  = true; // Train ?
+			private bool gpu   = true;       // Allow GPU Computations ?
+			private bool train = true;       // Train ?
 
-		private bool isTrained = false;
+			private bool isTrained  = false;
+		    private bool isReceived = false;
+		
+			//Train size must be greater than window_size = 60
+			private int trainingSize = 1000 ;  // Train Size 
+			private int epochs       = 50;    // Epochs
+			private int scale        = 100;   // Scale
+						
+			private string fileName = "model1";   // File Name to export model
 
-		//Train size must be greater than window_size = 60
-		private int trainingSize = 500 ; // Train Size 
-		private int epochs       = 10;  // Epochs
-		private int scale        = 100; // Scale
-
-		private string fileName = "model1"; // File Name to export model
-
-		private double momentum      = 0.9; // Momentum (for SGD)
-		private double learningRate  = 0.001; // Learning Rate 
-		private double testingPart   = 10; // Percentage of Train/Test Split
-		private double testingWeight = 50; // Percentage of Train/Test Score Weights
-
-		private int bars            = 5;
-		private int prevTrain       = 0;
-		private int retrainInterval = 10;
+			private double momentum      = 0.9;   // Momentum (for SGD)
+			private double learningRate  = 0.001; // Learning Rate 
+			private double testingPart   = 10;    // Percentage of Train/Test Split
+			private double testingWeight = 50;    // Percentage of Train/Test Score Weights
+            				
+			private int bars            = 5;      // Number of Bars To Predict
+		    private int prevTrain       = 0;      // The Bar NUmber on which the model was previously trained
+		    private int retrainInterval = 10;     // The default Interval after which the model should be retrained
 			
-		// For Connection with socket
-		public TcpClient socket;
-		public NetworkStream stream;
+		    // For Connection with socket
+		    public TcpClient socket;
+			public NetworkStream stream;          // for reading and writing data
 
         #endregion
 		
@@ -73,7 +75,7 @@ namespace NinjaTrader.Indicator
 
 			public bool GPU {get; set;}
 			public bool Train {get; set;}
-
+	
 			public int Architecture {get; set;}
 			public int Optimizer {get; set;}
 			public int Loss{get; set;}
@@ -87,11 +89,25 @@ namespace NinjaTrader.Indicator
 			public double TestingWeight{get; set;}
 
 		}
-
+	
 		// Parameters to be received from Trained model
 		public class PredictionParameters
 		{
 			public List<double> Eval {get; set;}
+			public List<double> Pred {get; set;}
+		}
+		
+		// Parameters to be sent when fetching previously trained results
+		public class SendParameters
+		{
+			public string FileName {get; set;}
+			public bool Train {get; set;}
+			public int Bars {get; set ;}			
+		}			
+		
+		// Parameters to be received when fetching previously trained model language.
+		public class ReceivePrediction
+		{
 			public List<double> Pred {get; set;}
 		}
 		
@@ -104,6 +120,11 @@ namespace NinjaTrader.Indicator
         {
             Overlay				= false;
 			CalculateOnBarClose = true;
+			
+			// User defined Variables
+			
+			retrain             = true; // Allow Retraining  ?
+			
         }
 
         /// <summary>
@@ -111,116 +132,197 @@ namespace NinjaTrader.Indicator
         /// </summary>
         protected override void OnBarUpdate()
         {
-		//For Training on Real-Time Data	
-		if(Historical)
-			return;
-
-		// Collect Enough Data
-		if (CurrentBar < trainingSize)
-			return;
+		    //For Training on Real-Time Data	
+			if(Historical)
+				return;
 			
-		int interval = CurrentBar - prevTrain;
-
-		if (!isTrained ||(isTrained && interval == retrainInterval))
-		{
-			// Establishing connection				
-			socket = new TcpClient();
-			socket.Connect("localhost", 9090);
-			stream = socket.GetStream();
-
-			if (socket.Connected)
-	            {
-				Print("connected!");
-
-				List<string> closePrice = new List<string>();
-				List<string> time = new List<string>();
-				for (int index = 0; index < trainingSize; index++) 
-				{
-					 closePrice.Add(Close[index].ToString() );	
-					 time.Add(Time[index].ToString());
-				}
-					
-				// Storing the parameters for training
-				var jsonObject = new trainParameters();				
-
-				jsonObject.Data = closePrice;
-				jsonObject.Time = time;
-				jsonObject.FileName = fileName;
-				jsonObject.GPU = gpu;
-				jsonObject.Train = train;
-				jsonObject.Architecture = (int)architecture;
-				jsonObject.Optimizer = (int)optimizer;
-				jsonObject.Loss = (int)loss;
-				jsonObject.LearningRate = learningRate;
-				jsonObject.Epochs = epochs;
-				jsonObject.Scale = scale;
-				jsonObject.Momentum = momentum;
-				jsonObject.TestingPart = testingPart;
-				jsonObject.TestingWeight = testingWeight;
-				jsonObject.Bars = bars;
-
-				// Serializing to JSON
-				string jsonString = JsonConvert.SerializeObject(jsonObject);
-				Byte[] data = Encoding.UTF8.GetBytes(jsonString);
-
-				stream.Write(data, 0, data.Length);		         
-				Print("Sent : " + jsonString);
-
-				isTrained = true;
-				prevTrain = CurrentBar;				
-			}	
+			// If the model needs to be trained
+			if (train)
+			{			
+				// Collect Enough Data
+				if (CurrentBar < trainingSize)
+					return;
 				
-			else
-			{
-			   Print("connection failed!");
-			}
-		}
-		// Receiving data after training from the server  
-		else if(socket.Connected)
-		{
-			if(stream.DataAvailable)
-			{
-				byte[] data = new Byte[2*256];
-				string response = "";
-				Int32 bytes = stream.Read(data, 0, data.Length);
-				if(bytes > 1)
-				response = Encoding.UTF8.GetString(data,0,bytes);
+				int interval = CurrentBar - prevTrain;                // Interval elapsed since last training of the model
 
-				if(response != "")
-				{ 
-					Print("Received : " + response);
-					var jsonObject = new PredictionParameters();
+				if (!isTrained ||(retrain && interval == retrainInterval))      // For sending data to the model
+				{
+					// Establishing connection				
+					socket = new TcpClient();
+					socket.Connect("localhost", 9090);
+					stream = socket.GetStream();
 
-					// Deserializing JSON data 
-					jsonObject = JsonConvert.DeserializeObject<PredictionParameters>(response);
-
-					// Plotting the predictions on the chart
-					for (int i=-1;i>=-1*bars;i--)
+					if (socket.Connected)
 					{
-						double ypred = double.Parse(jsonObject.Pred[(-1*i)-1].ToString());
-						DrawDot("Prediction " + i.ToString(), true, i, ypred, Color.Cyan);
+						Print("Connected to localhost : 9090");
+											
+						List<string> closePrice = new List<string>();
+						List<string> time = new List<string>();
+						for (int index = 0; index < trainingSize; index++) 
+						{
+							closePrice.Add(Close[index].ToString() );	
+							time.Add(Time[index].ToString());
+						}
+						
+						closePrice.Reverse();
+						time.Reverse();
+						// Storing the parameters for training in a class object
+						var jsonObject = new trainParameters();				
+						
+						jsonObject.Data          = closePrice;
+						jsonObject.Time          = time;
+						jsonObject.FileName      = fileName;
+						jsonObject.Train         = train;
+						jsonObject.GPU           = gpu;
+						jsonObject.Architecture  = (int)architecture;
+						jsonObject.Optimizer     = (int)optimizer;
+						jsonObject.Loss          = (int)loss;
+						jsonObject.LearningRate  = learningRate;
+						jsonObject.Epochs        = epochs;
+						jsonObject.Scale         = scale;
+						jsonObject.Momentum      = momentum;
+						jsonObject.TestingPart   = testingPart;
+						jsonObject.TestingWeight = testingWeight;
+						jsonObject.Bars          = bars;
+						
+						// Serializing to JSON
+						string jsonString = JsonConvert.SerializeObject(jsonObject);
+						Byte[] data = Encoding.UTF8.GetBytes(jsonString);
+			
+						stream.Write(data, 0, data.Length);		     // sending data to the socket    
+						//Print("Sent : " + jsonString);
+ 						Print("Data Sent Successfully!");
+						
+						isTrained = true;
+						prevTrain = CurrentBar;			
 
-					} 
+					}					
+					else
+					{
+					Print("connection failed!");
+					}
+				}
+				// Receiving data after training from the server 
+				if(socket.Connected)
+				{
+					if(stream.DataAvailable)
+					{
+						byte[] data = new Byte[2*256];
+						string response = "";
+						Int32 bytes = stream.Read(data, 0, data.Length);
+						response = Encoding.UTF8.GetString(data,0,bytes);
 
-					// closing the socket
-					stream.Close();
-					socket.Close();
+						if(response != "")
+						{ 
+							//Print("Received : " + response);
+							Print("Data Received Successfully!");
+							var jsonObject = new PredictionParameters();
+							
+							// Deserializing JSON data 
+							jsonObject = JsonConvert.DeserializeObject<PredictionParameters>(response);
+
+							// Plotting the predictions on the chart
+							for (int i=-1;i>=-1*bars;i--)
+							{
+								double ypred = double.Parse(jsonObject.Pred[(-1*i)-1].ToString());
+								DrawDot("Prediction " + i.ToString(), true, i, ypred, Color.Cyan);
+								
+							} 
+							
+							// closing the socket
+							stream.Close();
+							socket.Close();
+						}
+						else
+							Print("Not Received!");
+					}
+					else 
+						Print("Prediction Not Available!");
+				}			
+				else
+					Print("Socket Disconnected! ");
+			}        // end of train
+			// receive predictions from previously trained model
+			else if(!isReceived)
+			{
+				// Establishing connection				
+				socket = new TcpClient();
+				socket.Connect("localhost", 9090);
+				stream = socket.GetStream();
+
+				if (socket.Connected)
+				{
+					
+					Print("Connected to localhost : 9090");
+					
+					// Storing parameters to be sent to model in a class object
+					var jsonObject = new SendParameters();				
+					
+					jsonObject.FileName = fileName;
+					jsonObject.Train    = train;
+					jsonObject.Bars     = bars;
+					
+					// Serializing to JSON
+					string jsonString = JsonConvert.SerializeObject(jsonObject);
+					Byte[] data = Encoding.UTF8.GetBytes(jsonString);
+		
+					stream.Write(data, 0, data.Length);		         
+					//Print("Sent : " + jsonString);
+					Print("Data Sent Succesfully!");
+					
+					if(stream.CanRead)
+					{
+						byte[] recData = new Byte[256];
+						string response = string.Empty;
+						Int32 bytes = stream.Read(recData, 0, recData.Length);
+						response = Encoding.UTF8.GetString(recData,0,bytes);
+
+						if(response != string.Empty)
+						{ 
+							//Print("Received : " + response);
+							Print("Successfully Received Data!");
+							var jsonObj = new ReceivePrediction();
+							
+							// Deserializing JSON data 
+							jsonObj = JsonConvert.DeserializeObject<ReceivePrediction>(response);
+
+							// Plotting the predictions on the chart
+							for (int i=-1;i>=-1*bars;i--)
+							{
+								double ypred = double.Parse(jsonObj.Pred[(-1*i)-1].ToString());
+								DrawDot("Prediction " + i.ToString(), true, i, ypred, Color.Cyan);
+								
+							} 
+							
+							// closing the socket
+							stream.Close();
+							socket.Close();
+						}
+						else
+							Print("Prediction cannot be Received!");
+					}
+					else 
+						Print("Prediction Not Available!");
+					
+					isReceived = true;
 				}
 				else
-					Print("Not Received!");
-			}
-			else 
-				Print("Prediction Not Available!");
-		}		
-		else
-			Print("Socket Disconnected! ");
-        }
+				{
+					Print("Connection could not be established!");
+				}
+							
+			} // end of receive predictions from previously trained model
+			
+			
+		}         // end of OnBarUpdate
+			
+        
 
         #region Properties
 		
 		[Description("Architecture of the Training Model")]
 		[Category("Model Parameters")]
-	        public E_Architecture Architecture
+	    public E_Architecture Architecture
 		{
 			get { return architecture; }
 		    set { architecture = value; }
@@ -244,7 +346,7 @@ namespace NinjaTrader.Indicator
 
 		[Description("If GPU is enabled")]
 		[Category("Model Parameters")]
-		public bool Gpu
+		public bool GPU
 		{
 			get {return gpu;}
 			set{gpu = value;}
@@ -330,6 +432,13 @@ namespace NinjaTrader.Indicator
 			set {fileName = value;}
 		}
 		
+		[Description("If the model should be Retrained or not!")]
+		[Category("Model Parameters")]
+		public bool retrain
+		{
+			get; set;
+		}
+		
 		[Description("The Number Of Bars after which to retrain")]
 		[Category("Model Parameters")]
 		public int Retrain_Interval
@@ -342,29 +451,26 @@ namespace NinjaTrader.Indicator
     }
 }
 
-	#region Enum Declaration
-		public enum E_Optimizer
-		{
-		  RMSProp,
-		  SGD,
-		  Adam,
-		  Adagrad
-		};
+	    #region Enum Declaration
+		   public enum E_Optimizer {
+			  RMSProp,
+			  SGD,
+			  Adam,
+			  Adagrad
+			};
 			  
-		public enum E_Architecture 
-		{
-		  LSTM,
-		  GRU,
-		  BidirectionalLSTM,
-		  BidirectionalGRU
-		};
-
-		public enum E_Loss   
-		{
-		   MSE,
-		   R2
-		};
-	#endregion
+			public enum E_Architecture {
+			  LSTM,
+			  GRU,
+			  BidirectionalLSTM,
+			  BidirectionalGRU
+			};
+			 
+			public enum E_Loss   {
+			   MSE,
+			   R2
+			};
+		#endregion
 
 #region NinjaScript generated code. Neither change nor remove.
 // This namespace holds all indicators and is required. Do not change it.
