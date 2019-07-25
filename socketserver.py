@@ -8,8 +8,6 @@ def train_test_model(msg = ''):
     msg = msg.replace('false', 'False')
     msg = ast.literal_eval(msg)
     
-    print(type(msg))
-    
     if(type(msg) == dict):
         input_data = msg
     else:
