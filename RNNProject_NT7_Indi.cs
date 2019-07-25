@@ -1,19 +1,10 @@
 #region Using declarations
 using System;
 using System.ComponentModel;
-//using System.Diagnostics;
 using System.Drawing;
-//using System.Drawing.Drawing2D;
-//using System.Xml.Serialization;
-//using NinjaTrader.Cbi;
-//using NinjaTrader.Data;
-//using NinjaTrader.Gui.Chart;
-//using System.Net;
 using System.Net.Sockets;
 using System.Runtime.Serialization;
 using Newtonsoft.Json;
-
-//using System.ServiceModel.Web;
 using System.Collections.Generic;
 using System.Text;
 #endregion
