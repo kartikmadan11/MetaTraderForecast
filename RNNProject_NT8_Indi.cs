@@ -111,38 +111,42 @@ namespace NinjaTrader.NinjaScript.Indicators
 		
 		protected void receivePred()
 		{
-				 if (DEBUG) Print("Can Read : " + stream.CanRead.ToString());
-			     if (DEBUG) Print("Is Data Available : " + stream.DataAvailable.ToString());
-				 
-				 if(stream.DataAvailable)
-				 {
-					//socket.ReceiveTimeout = 20000;
-					byte[] data     = new Byte[2*256];
-		            string response = string.Empty;
-		            Int32 bytes     = stream.Read(data, 0, data.Length);
-		            response        = Encoding.UTF8.GetString(data,0,bytes);
+			if (DEBUG) Print("Can Read : " + stream.CanRead.ToString());
+			if (DEBUG) Print("Is Data Available : " + stream.DataAvailable.ToString());
 
-					if(response != string.Empty)
-		            { 
-						if (DEBUG) 	Print("Received : " + response);
-						
-						Print("Data Received Successfully!");
-						dynamic jsonObject = new ExpandoObject();						
-						jsonObject         = JsonConvert.DeserializeObject(response);
+			 if(stream.DataAvailable)
+			 {
+				byte[] data     = new Byte[2*256];
+				string response = string.Empty;
+				Int32 bytes     = stream.Read(data, 0, data.Length);
+				response        = Encoding.UTF8.GetString(data,0,bytes);
 
-						// Plotting the predictions on  the chart
-						for (int i=-1; i>=-1*bars; i--)
-						{
-							double ypred = double.Parse(jsonObject.Pred[(-1*i)-1].ToString());
-							Draw.Dot(this, "Prediction " + i.ToString(), true, i, ypred, Brushes.Aqua);
-						} 
-	
-						stream.Close();
+				if(response != string.Empty)
+			        { 
+					if (DEBUG) 	Print("Received : " + response);
+
+					Print("Data Received Successfully!");
+					Draw.TextFixed(this, "Chart Message", "Predictions Received!\nPlotting on Chart..." , TextPosition.TopRight);
+					dynamic jsonObject = new ExpandoObject();						
+					jsonObject         = JsonConvert.DeserializeObject(response);
+
+					// Plotting the predictions on  the chart
+					for (int i=-1; i>=-1*bars; i--)
+					{
+						double ypred = double.Parse(jsonObject.Pred[(-1*i)-1].ToString());
+						Draw.Dot(this, "Prediction " + i.ToString(), true, i, ypred, Brushes.Aqua);
+						Draw.TextFixed(this, "Chart Message", "" , TextPosition.TopRight);
+					} 
+
+					stream.Close();
 				        socket.Close();
-					}
-				 }
-				 else
-					Print("Prediction Data Not Available!");
+				}
+			 }
+			 else
+			 {
+				Print("Please Wait... Loading Predictions...");
+				Draw.TextFixed(this, "Chart Message", "Loading Predictions\nPlease Wait..." , TextPosition.TopRight);
+			 }
 		}
 
 		protected override void OnBarUpdate()
@@ -155,33 +159,55 @@ namespace NinjaTrader.NinjaScript.Indicators
 			{
 				// Collect Enough Data
 				if (CurrentBar < trainingSize)
+				{
+					Draw.TextFixed(this, "Chart Message", "Not Enough data for Training!" , TextPosition.TopRight);
 					return;
+				}
 				
 				// Number of bars elapsed since previous Training
-			    int interval = CurrentBar - prevTrain;
+			        int interval = CurrentBar - prevTrain;
 				
 				if (!isTrained || (retrain && interval == retrainInterval))
 				{
-					// Establishing connection				
-					socket = new TcpClient();
-					socket.Connect("localhost", 9090);          // Connecting to python server on localhost
-					stream = socket.GetStream();                // Creating stream to read and write data
+					// Establishing connection
+					try 
+					{
+						socket = new TcpClient();
+						socket.Connect("localhost", 9090);          // Connecting to python server on localhost
+						stream = socket.GetStream();                // Creating stream to read and write data
+					}
+					catch (ArgumentNullException e)
+					{
+						Print(Time[0].ToString()+ " Exception Occured! The hostname parameter is null. "+ e.ToString());
+					}
+					catch (ArgumentOutOfRangeException e)
+					{
+						Print(Time[0].ToString()+ " Exception Occured! The port parameter is not between MinPort and MaxPort."+ e.ToString());
+					}
+					catch (SocketException e)
+					{
+						Print(Time[0].ToString()+ " Exception Occured! "+ e.ToString());
+					}
+					catch (ObjectDisposedException e)
+					{
+						Print(Time[0].ToString()+ " Exception Occured! TcpClient is closed. "+ e.ToString());
+					}
 
 					if (socket.Connected)
-		            {
-		                Print("connected to localhost : 9090");
-							
+					{
+						Print("connected to localhost : 9090");
+						Draw.TextFixed(this, "Chart Message", "Connected!" , TextPosition.TopRight);
 						// Collecting close Price and Dates data
 						List<string> closePrice = new List<string>();
 						List<string> time = new List<string>();
 						for (int index = 0; index < trainingSize; index++) 
-					    {
-							 closePrice.Add(Close[index].ToString() );	
-							 time.Add(Time[index].ToString());
-					    }
+						{
+							closePrice.Add(Close[index].ToString() );	
+							time.Add(Time[index].ToString());
+						}
 
-                        closePrice.Reverse();
-                        time.Reverse();
+						closePrice.Reverse();
+						time.Reverse();
 						
 						// Creating dynamic object to store model parameters
 						dynamic jsonObject = new ExpandoObject();				
@@ -205,28 +231,40 @@ namespace NinjaTrader.NinjaScript.Indicators
 						string jsonString   = JsonConvert.SerializeObject(jsonObject);
 						Byte[] data         = Encoding.UTF8.GetBytes(jsonString);
 	         
-						stream.Write(data, 0, data.Length);		         
-						
-						if (DEBUG)   
-							Print("Sent : " + jsonString);
+						if (stream.CanWrite)
+						{
+							stream.Write(data, 0, data.Length);		         
+							
+							if (DEBUG)   
+								Print("Sent : " + jsonString);
 
-						Print("Data Sent Successfully!");
-						isTrained = true;
-						prevTrain = CurrentBar;					
+							Print("Data Sent Successfully!");
+							Draw.TextFixed(this, "Chart Message", "Data Sent..." , TextPosition.TopRight);
+							isTrained = true;
+							prevTrain = CurrentBar;	
+						}
+						else
+						{
+						    Print("Data cannot be sent to the stream!");
+							stream.Close();
+							socket.Close();
+							return;
+						}
 					}
 					else
 					{
 						Print("Connection Failed!");
+						Draw.TextFixed(this, "Chart Message", "Connection Failed!" , TextPosition.TopRight);
 					}
 					
 					
 				}      
 				
 				// Receiving result from trained model
-			 if(socket.Connected)
-			 {
-				receivePred();
-			 }				
+				 if(socket.Connected)
+				 {
+					receivePred();
+				 }				
 				
 			}           // end of function implementing prediction with real time training
 			
@@ -234,14 +272,34 @@ namespace NinjaTrader.NinjaScript.Indicators
 			else if(!isReceived)
 			{
 				// Establishing connection				
-				socket = new TcpClient();
-				socket.Connect("localhost", 9090);          // Connecting to python server on localhost
-				stream = socket.GetStream();                // Creating stream to read and write data
-
+				try 
+				{
+					socket = new TcpClient();
+					socket.Connect("localhost", 9090);          // Connecting to python server on localhost
+					stream = socket.GetStream();                // Creating stream to read and write data
+				}
+				catch (ArgumentNullException e)
+				{
+					Print(Time[0].ToString()+ " Exception Occured! The hostname parameter is null. "+ e.ToString());
+				}
+				catch (ArgumentOutOfRangeException e)
+				{
+					Print(Time[0].ToString()+ " Exception Occured! The port parameter is not between MinPort and MaxPort."+ e.ToString());
+				}
+				catch (SocketException e)
+				{
+					Print(Time[0].ToString()+ " Exception Occured! "+ e.ToString());
+				}
+				catch (ObjectDisposedException e)
+				{
+					Print(Time[0].ToString()+ " Exception Occured! TcpClient is closed. "+ e.ToString());
+				}
+				
 				if (socket.Connected)
 				{
 					Print("Connected to localhost : 9090");
-						
+					Draw.TextFixed(this, "Chart Message", "Connected!" , TextPosition.TopRight);
+					
 					// Creating dynamic object to store model parameters
 					dynamic jsonObject = new ExpandoObject();				
 
@@ -252,16 +310,26 @@ namespace NinjaTrader.NinjaScript.Indicators
 					string jsonString   = JsonConvert.SerializeObject(jsonObject);
 					Byte[] data         = Encoding.UTF8.GetBytes(jsonString);
 		     
-					stream.Write(data, 0, data.Length);		         
-						
-					Print("Data Sent Successfully!");
+					if (stream.CanWrite)
+					{
+						stream.Write(data, 0, data.Length);	
+										
+						Print("Data Sent Successfully!");
+						Draw.TextFixed(this, "Chart Message", "Data Sent..." , TextPosition.TopRight);
+					}
+					else
+					{
+						Print("Data cannot be sent to the stream!");
+						stream.Close();
+						socket.Close();
+						return;
+					}
 						
 					if (DEBUG) Print("Can Read : " + stream.CanRead.ToString());
 					if (DEBUG) Print("Is Data Available : " + stream.DataAvailable.ToString());
 
 					if(stream.CanRead)
 					{
-						//socket.ReceiveTimeout = 20000;
 						byte[] recData     = new Byte[256];
 						string response = string.Empty;
 						Int32 bytes     = stream.Read(recData, 0, recData.Length);
@@ -272,6 +340,7 @@ namespace NinjaTrader.NinjaScript.Indicators
 							if (DEBUG) 	Print("Received : " + response);
 								
 							Print("Data Received Successfully!");
+							Draw.TextFixed(this, "Chart Message", "Predictions Received!\nPlotting on Chart..." , TextPosition.TopRight);
 							dynamic jsonObj = new ExpandoObject();						
 							jsonObj         = JsonConvert.DeserializeObject(response);
 
@@ -280,6 +349,7 @@ namespace NinjaTrader.NinjaScript.Indicators
 							{
 								double ypred = double.Parse(jsonObj.Pred[(-1*i)-1].ToString());
 								Draw.Dot(this, "Prediction " + i.ToString(), true, i, ypred, Brushes.Aqua);
+								Draw.TextFixed(this, "Chart Message", "" , TextPosition.TopRight);
 							} 
 
 							stream.Close();
@@ -287,7 +357,10 @@ namespace NinjaTrader.NinjaScript.Indicators
 						}
 					}
 					else
-						Print("Prediction Data Not Available!");
+					{
+						Print("Prediction Data Not Available!\nPlease Train the Model...");
+						Draw.TextFixed(this, "Chart Message", "Predictions Not Available!\nPlease Train the Model..." , TextPosition.TopRight);
+					}
 						
 					isReceived  = true;
 						
@@ -295,9 +368,11 @@ namespace NinjaTrader.NinjaScript.Indicators
 				else
 				{
 					Print("Connection Failed!");
+					Draw.TextFixed(this, "Chart Message", "Connection Failed!" , TextPosition.TopRight);
 				}
 
 			}          // end of function implementing prediction without training
+
 			
 		}              // end of OnBarUpdate()
 			
