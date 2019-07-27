@@ -2,6 +2,8 @@
 using System;
 using System.ComponentModel;
 using System.Drawing;
+using NinjaTrader.Data;
+using NinjaTrader.Gui.Chart;
 using System.Net.Sockets;
 using System.Runtime.Serialization;
 using Newtonsoft.Json;
@@ -22,87 +24,87 @@ namespace NinjaTrader.Indicator
         #region Variables
         // Wizard generated variables
         // User defined variables (add any user defined variables below)
-			private E_Architecture architecture = E_Architecture.LSTM; // RNN Architecture
-		    private E_Optimizer optimizer       = E_Optimizer.RMSProp; // Optimizer
-		    private E_Loss loss                 = E_Loss.MSE;          // Loss Function
-			
-			private bool gpu   = true;       // Allow GPU Computations ?
-			private bool train = true;       // Train ?
+		private E_Architecture architecture = E_Architecture.LSTM; // RNN Architecture
+		private E_Optimizer optimizer       = E_Optimizer.RMSProp; // Optimizer
+		private E_Loss loss                 = E_Loss.MSE;          // Loss Function
 
-			private bool isTrained  = false;
-		    private bool isReceived = false;
-		
-			//Train size must be greater than window_size = 60
-			private int trainingSize = 1000 ;  // Train Size 
-			private int epochs       = 50;    // Epochs
-			private int scale        = 100;   // Scale
-						
-			private string fileName = "model1";   // File Name to export model
+		private bool gpu   = true;       // Allow GPU Computations ?
+		private bool train = true;       // Train ?
 
-			private double momentum      = 0.9;   // Momentum (for SGD)
-			private double learningRate  = 0.001; // Learning Rate 
-			private double testingPart   = 10;    // Percentage of Train/Test Split
-			private double testingWeight = 50;    // Percentage of Train/Test Score Weights
-            				
-			private int bars            = 5;      // Number of Bars To Predict
-		    private int prevTrain       = 0;      // The Bar NUmber on which the model was previously trained
-		    private int retrainInterval = 10;     // The default Interval after which the model should be retrained
-			
-		    // For Connection with socket
-		    public TcpClient socket;
-			public NetworkStream stream;          // for reading and writing data
+		private bool isTrained  = false;
+		private bool isReceived = false;
+
+		//Train size must be greater than window_size = 60
+		private int trainingSize = 500 ;  // Train Size 
+		private int epochs       = 5;    // Epochs
+		private int scale        = 100;   // Scale
+
+		private string fileName = "model1";   // File Name to export model
+
+		private double momentum      = 0.9;   // Momentum (for SGD)
+		private double learningRate  = 0.001; // Learning Rate 
+		private double testingPart   = 10;    // Percentage of Train/Test Split
+		private double testingWeight = 50;    // Percentage of Train/Test Score Weights
+
+		private int bars            = 5;      // Number of Bars To Predict
+		private int prevTrain       = 0;      // The Bar NUmber on which the model was previously trained
+		private int retrainInterval = 10;     // The default Interval after which the model should be retrained
+
+		// For Connection with socket
+		public TcpClient socket;
+		public NetworkStream stream;          // for reading and writing data
 
         #endregion
 		
-		#region Class Definition
+	#region Class Definition
 
-		// Parameters to be sent to the model for training
-		public class trainParameters
-		{
-			public List<string> Data{ get; set;}
-			public List<string> Time{get; set;}
-			
-			public string FileName {get; set;}
+	// Parameters to be sent to the model for training
+	public class trainParameters
+	{
+		public List<string> Data{ get; set;}
+		public List<string> Time{get; set;}
 
-			public bool GPU {get; set;}
-			public bool Train {get; set;}
-	
-			public int Architecture {get; set;}
-			public int Optimizer {get; set;}
-			public int Loss{get; set;}
-			public int Epochs {get; set;}
-			public int Bars {get; set ;}
-			public int Scale {get; set;}
-			
-			public double LearningRate {get; set;}
-			public double Momentum {get; set;}
-			public double TestingPart{get; set;}
-			public double TestingWeight{get; set;}
+		public string FileName {get; set;}
 
-		}
-	
-		// Parameters to be received from Trained model
-		public class PredictionParameters
-		{
-			public List<double> Eval {get; set;}
-			public List<double> Pred {get; set;}
-		}
-		
-		// Parameters to be sent when fetching previously trained results
-		public class SendParameters
-		{
-			public string FileName {get; set;}
-			public bool Train {get; set;}
-			public int Bars {get; set ;}			
-		}			
-		
-		// Parameters to be received when fetching previously trained model language.
-		public class ReceivePrediction
-		{
-			public List<double> Pred {get; set;}
-		}
-		
-		#endregion
+		public bool GPU {get; set;}
+		public bool Train {get; set;}
+
+		public int Architecture {get; set;}
+		public int Optimizer {get; set;}
+		public int Loss{get; set;}
+		public int Epochs {get; set;}
+		public int Bars {get; set ;}
+		public int Scale {get; set;}
+
+		public double LearningRate {get; set;}
+		public double Momentum {get; set;}
+		public double TestingPart{get; set;}
+		public double TestingWeight{get; set;}
+
+	}
+
+	// Parameters to be received from Trained model
+	public class PredictionParameters
+	{
+		public List<double> Eval {get; set;}
+		public List<double> Pred {get; set;}
+	}
+
+	// Parameters to be sent when fetching previously trained results
+	public class SendParameters
+	{
+		public string FileName {get; set;}
+		public bool Train {get; set;}
+		public int Bars {get; set ;}			
+	}			
+
+	// Parameters to be received when fetching previously trained model language.
+	public class ReceivePrediction
+	{
+		public List<double> Pred {get; set;}
+	}
+
+	#endregion
 
         /// <summary>
         /// This method is used to configure the indicator and is called once before any bar data is loaded.
@@ -138,15 +140,37 @@ namespace NinjaTrader.Indicator
 
 				if (!isTrained ||(retrain && interval == retrainInterval))      // For sending data to the model
 				{
-					// Establishing connection				
-					socket = new TcpClient();
-					socket.Connect("localhost", 9090);
-					stream = socket.GetStream();
+					// Establishing connection	
+					try 
+					{
+						socket = new TcpClient();
+						socket.Connect("localhost", 9090);          // Connecting to python server on localhost
+						stream = socket.GetStream();                // Creating stream to read and write data
+					}
+					catch (ArgumentNullException e)
+					{
+						Print(Time[0].ToString()+ " Exception Occured! The hostname parameter is null. "+ e.ToString());
+					}
+					catch (ArgumentOutOfRangeException e)
+					{
+						Print(Time[0].ToString()+ " Exception Occured! The port parameter is not between MinPort and MaxPort."+ e.ToString());
+					}
+					catch (SocketException e)
+					{
+						Print(Time[0].ToString()+ " Exception Occured! "+ e.ToString());
+					}
+					catch (ObjectDisposedException e)
+					{
+						Print(Time[0].ToString()+ " Exception Occured! TcpClient is closed. "+ e.ToString());
+					}
 
 					if (socket.Connected)
 					{
 						Print("Connected to localhost : 9090");
-											
+						var message = DrawTextFixed("Chart Message", "Connected!" , TextPosition.TopRight);
+						message.TextColor = Color.DarkBlue;
+										
+						// Collecting close Price and Dates data
 						List<string> closePrice = new List<string>();
 						List<string> time = new List<string>();
 						for (int index = 0; index < trainingSize; index++) 
@@ -157,6 +181,7 @@ namespace NinjaTrader.Indicator
 						
 						closePrice.Reverse();
 						time.Reverse();
+						
 						// Storing the parameters for training in a class object
 						var jsonObject = new trainParameters();				
 						
@@ -180,17 +205,29 @@ namespace NinjaTrader.Indicator
 						string jsonString = JsonConvert.SerializeObject(jsonObject);
 						Byte[] data = Encoding.UTF8.GetBytes(jsonString);
 			
-						stream.Write(data, 0, data.Length);		     // sending data to the socket    
-						//Print("Sent : " + jsonString);
- 						Print("Data Sent Successfully!");
-						
-						isTrained = true;
-						prevTrain = CurrentBar;			
+						if (stream.CanWrite)
+						{
+							stream.Write(data, 0, data.Length);		     // sending data to the socket    
+							//Print("Sent : " + jsonString);
+							Print("Data Sent Successfully!");
+							var msg = DrawTextFixed( "Chart Message", "Data Sent..." , TextPosition.TopRight);
+							msg.TextColor = Color.DarkBlue;
+							
+							isTrained = true;
+							prevTrain = CurrentBar;	
+						}
+						else
+						{
+						    Print("Data cannot be sent to the stream!");
+							stream.Close();
+							socket.Close();
+							return;
+						}
 
 					}					
 					else
 					{
-					Print("connection failed!");
+						Print("connection failed!");
 					}
 				}
 				// Receiving data after training from the server 
@@ -207,6 +244,9 @@ namespace NinjaTrader.Indicator
 						{ 
 							//Print("Received : " + response);
 							Print("Data Received Successfully!");
+							var message = DrawTextFixed( "Chart Message", "Predictions Received!\nPlotting on Chart..." , TextPosition.TopRight);
+							message.TextColor = Color.DarkBlue;
+							
 							var jsonObject = new PredictionParameters();
 							
 							// Deserializing JSON data 
@@ -217,7 +257,7 @@ namespace NinjaTrader.Indicator
 							{
 								double ypred = double.Parse(jsonObject.Pred[(-1*i)-1].ToString());
 								DrawDot("Prediction " + i.ToString(), true, i, ypred, Color.Cyan);
-								
+								DrawTextFixed("Chart Message", "" , TextPosition.TopRight);
 							} 
 							
 							// closing the socket
@@ -228,7 +268,11 @@ namespace NinjaTrader.Indicator
 							Print("Not Received!");
 					}
 					else 
-						Print("Prediction Not Available!");
+					{
+						Print("Please Wait... Loading Predictions...");
+						var message = DrawTextFixed("Chart Message", "Loading Predictions\nPlease Wait..." , TextPosition.TopRight);
+						message.TextColor = Color.DarkBlue;
+					}
 				}			
 				else
 					Print("Socket Disconnected! ");
@@ -237,14 +281,34 @@ namespace NinjaTrader.Indicator
 			else if(!isReceived)
 			{
 				// Establishing connection				
-				socket = new TcpClient();
-				socket.Connect("localhost", 9090);
-				stream = socket.GetStream();
-
+				try 
+				{
+					socket = new TcpClient();
+					socket.Connect("localhost", 9090);          // Connecting to python server on localhost
+					stream = socket.GetStream();                // Creating stream to read and write data
+				}
+				catch (ArgumentNullException e)
+				{
+					Print(Time[0].ToString()+ " Exception Occured! The hostname parameter is null. "+ e.ToString());
+				}
+				catch (ArgumentOutOfRangeException e)
+				{
+					Print(Time[0].ToString()+ " Exception Occured! The port parameter is not between MinPort and MaxPort."+ e.ToString());
+				}
+				catch (SocketException e)
+				{
+					Print(Time[0].ToString()+ " Exception Occured! "+ e.ToString());
+				}
+				catch (ObjectDisposedException e)
+				{
+					Print(Time[0].ToString()+ " Exception Occured! TcpClient is closed. "+ e.ToString());
+				}
+				
 				if (socket.Connected)
 				{
 					
 					Print("Connected to localhost : 9090");
+					DrawTextFixed("Chart Message", "Connected!" , TextPosition.TopRight);
 					
 					// Storing parameters to be sent to model in a class object
 					var jsonObject = new SendParameters();				
@@ -257,10 +321,23 @@ namespace NinjaTrader.Indicator
 					string jsonString = JsonConvert.SerializeObject(jsonObject);
 					Byte[] data = Encoding.UTF8.GetBytes(jsonString);
 		
-					stream.Write(data, 0, data.Length);		         
-					//Print("Sent : " + jsonString);
-					Print("Data Sent Succesfully!");
-					
+					if (stream.CanWrite)
+					{
+						stream.Write(data, 0, data.Length);	
+										
+						Print("Data Sent Successfully!");
+						//Print("Sent : " + jsonString);
+						var message = DrawTextFixed("Chart Message", "Data Sent..." , TextPosition.TopRight);
+						message.TextColor = Color.DarkBlue;
+					}
+					else
+					{
+						Print("Data cannot be sent to the stream!");
+						stream.Close();
+						socket.Close();
+						return;
+					}
+										
 					if(stream.CanRead)
 					{
 						byte[] recData = new Byte[256];
@@ -272,6 +349,7 @@ namespace NinjaTrader.Indicator
 						{ 
 							//Print("Received : " + response);
 							Print("Successfully Received Data!");
+							DrawTextFixed("Chart Message", "Predictions Received!\nPlotting on Chart..." , TextPosition.TopRight);
 							var jsonObj = new ReceivePrediction();
 							
 							// Deserializing JSON data 
@@ -282,7 +360,7 @@ namespace NinjaTrader.Indicator
 							{
 								double ypred = double.Parse(jsonObj.Pred[(-1*i)-1].ToString());
 								DrawDot("Prediction " + i.ToString(), true, i, ypred, Color.Cyan);
-								
+								DrawTextFixed( "Chart Message", "" , TextPosition.TopRight);								
 							} 
 							
 							// closing the socket
@@ -290,16 +368,26 @@ namespace NinjaTrader.Indicator
 							socket.Close();
 						}
 						else
+						{
 							Print("Prediction cannot be Received!");
+							var message = DrawTextFixed("Chart Message", "Predictions Not Available!\nPlease Train the Model..." , TextPosition.TopRight);
+							message.TextColor = Color.DarkBlue;
+						}
 					}
 					else 
-						Print("Prediction Not Available!");
+					{
+						Print("Prediction Data Not Available!\nPlease Train the Model...");
+						var message = DrawTextFixed("Chart Message", "Predictions Not Available!\nPlease Train the Model..." , TextPosition.TopRight);
+						message.TextColor = Color.DarkBlue;
+					}
 					
 					isReceived = true;
 				}
 				else
 				{
 					Print("Connection could not be established!");
+					var message = DrawTextFixed("Chart Message", "Connection Failed!" , TextPosition.TopRight);
+					message.TextColor = Color.DarkBlue;
 				}
 							
 			} // end of receive predictions from previously trained model
@@ -312,7 +400,7 @@ namespace NinjaTrader.Indicator
         #region Properties
 		
 		[Description("Architecture of the Training Model")]
-		[Category("Model Parameters")]
+		[Category("Model Input Parameters")]
 	    public E_Architecture Architecture
 		{
 			get { return architecture; }
@@ -320,7 +408,7 @@ namespace NinjaTrader.Indicator
 		}
 		
 		[Description("Optimizer to be Used")]
-		[Category("Model Parameters")]
+		[Category("Model Input Parameters")]
 		public E_Optimizer Optimizer
 		{
 			get { return optimizer; }
@@ -328,7 +416,7 @@ namespace NinjaTrader.Indicator
 		}
 
 		[Description("Loss Function")]
-		[Category("Model Parameters")]
+		[Category("Model Input Parameters")]
 		public E_Loss Loss
 		{
 			get { return loss; }
@@ -336,7 +424,7 @@ namespace NinjaTrader.Indicator
 		}
 
 		[Description("If GPU is enabled")]
-		[Category("Model Parameters")]
+		[Category("Model Input Parameters")]
 		public bool GPU
 		{
 			get {return gpu;}
@@ -344,7 +432,7 @@ namespace NinjaTrader.Indicator
 		}
 
 		[Description("If training is enabled")]
-		[Category("Model Parameters")]
+		[Category("Model Input Parameters")]
 		public bool Train
 		{
 			get {return train;}
@@ -352,7 +440,7 @@ namespace NinjaTrader.Indicator
 		}
 
 		[Description("Size of data to be sent for training")]
-		[Category("Model Parameters")]
+		[Category("Model Input Parameters")]
 		public int Training_Size
 		{
 			get {return trainingSize;}
@@ -360,7 +448,7 @@ namespace NinjaTrader.Indicator
 		}
 
 		[Description("Epochs")]
-		[Category("Model Parameters")]
+		[Category("Model Input Parameters")]
 		public int Epochs
 		{
 			get {return epochs;}
@@ -368,7 +456,7 @@ namespace NinjaTrader.Indicator
 		}
 
 		[Description("Scaling Parameter")]
-		[Category("Model Parameters")]
+		[Category("Model Input Parameters")]
 		public int Scale
 		{
 			get {return scale;}
@@ -376,7 +464,7 @@ namespace NinjaTrader.Indicator
 		}
 
 		[Description("Number of future bars to predict")]
-		[Category("Model Parameters")]
+		[Category("Model Input Parameters")]
 		public int Bars_To_Predict
 		{
 			get {return bars;}
@@ -384,7 +472,7 @@ namespace NinjaTrader.Indicator
 		}
 
 		[Description("Momentum")]
-		[Category("Model Parameters")]
+		[Category("Model Input Parameters")]
 		public double Momentum
 		{
 			get {return momentum;}
@@ -392,7 +480,7 @@ namespace NinjaTrader.Indicator
 		}
 
 		[Description("Learning Rate for the model")]
-		[Category("Model Parameters")]
+		[Category("Model Input Parameters")]
 		public double Learning_Rate
 		{
 			get {return learningRate;}
@@ -400,7 +488,7 @@ namespace NinjaTrader.Indicator
 		}
 
 		[Description("Train/Test data split (in percentage)")]
-		[Category("Model Parameters")]
+		[Category("Model Input Parameters")]
 		public double Testing_Part
 		{
 			get {return testingPart ;}
@@ -408,7 +496,7 @@ namespace NinjaTrader.Indicator
 		}
 
 		[Description("Train/Test score(in percentage)")]
-		[Category("Model Parameters")]
+		[Category("Model Input Parameters")]
 		public double Testing_Weight
 		{
 			get {return testingWeight;}
@@ -416,7 +504,7 @@ namespace NinjaTrader.Indicator
 		}
 
 		[Description("Name of file to store Model")]
-		[Category("Model Parameters")]
+		[Category("Model Input Parameters")]
 		public string FileName
 		{
 			get {return fileName;}
@@ -424,14 +512,14 @@ namespace NinjaTrader.Indicator
 		}
 		
 		[Description("If the model should be Retrained or not!")]
-		[Category("Model Parameters")]
+		[Category("Model Input Parameters")]
 		public bool retrain
 		{
 			get; set;
 		}
 		
 		[Description("The Number Of Bars after which to retrain")]
-		[Category("Model Parameters")]
+		[Category("Model Input Parameters")]
 		public int Retrain_Interval
 		{
 			get {return retrainInterval;}
