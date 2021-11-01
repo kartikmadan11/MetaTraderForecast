@@ -12,7 +12,7 @@ The various parameter that can be opted for tuning the ML model are -
 - **Bidirectional LSTM**
 - **Bidirectional GRU**
 ### Losses
-- **Mean Sqaure Error**
+- **Mean Square Error**
 - **R^2 Score**
 ### Optimizers
 - **RMSProp** (Recommended)
