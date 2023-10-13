@@ -1,5 +1,5 @@
 # MetaTraderForecast
-Project that involves training, testing, evaluating and forecasting time series forex data from MetaTrader using Sockets to connect with Python.  An RNN Model of various architecture like LSTM, Bidirectional and GRU can be created. Supports CUDA Computation.
+A Project that involves training, testing, evaluating and forecasting time series forex data from MetaTrader using Sockets to connect with Python.  An RNN Model of various architecture like LSTM, Bidirectional and GRU can be created. Supports CUDA Computation.
 
 ## What does the project do?
 MQL based Expert Advisors are attached to charts of trading platforms to make RNN based forecasts. All machine learning parameters can be tuned from the input interface of the EA. The model can be trained and exported as a serialized .hdf5 file. Tests are run simultaneously with initial train and the data is split based on Testing Part (in %) parameter. The model can be evaluated on any number of metrics as provided in the input screen of the EA. The model can be loaded to retrain or forecast any number of future bars. 
